@@ -7,8 +7,8 @@
     <title>Trato — public order book</title>
     <link rel="icon" type="image/png" href="{{ static_url_for('trato/static', 'image/favicon-32.png') }}" />
     <link rel="apple-touch-icon" href="{{ static_url_for('trato/static', 'image/trato-192.png') }}" />
-    <link rel="stylesheet" href="{{ static_url_for('trato/static', 'css/trato.css') }}" />
-    <link rel="stylesheet" href="{{ static_url_for('trato/static', 'css/public_book.css') }}" />
+    <link rel="stylesheet" href="{{ static_url_for('trato/static', 'css/trato.css') }}?v={{ trato_version }}" />
+    <link rel="stylesheet" href="{{ static_url_for('trato/static', 'css/public_book.css') }}?v={{ trato_version }}" />
   </head>
   <body>
     <div class="pb-wrap">
@@ -114,20 +114,20 @@
         }
       };
     </script>
-    <script src="{{ static_url_for('trato/static', 'js/avatar.js') }}"></script>
-    <script src="{{ static_url_for('trato/static', 'js/orderbook_sort.js') }}"></script>
-    <script src="{{ static_url_for('trato/static', 'js/book_filter_counts.js') }}"></script>
-    <script src="{{ static_url_for('trato/static', 'i18n/en.js') }}"></script>
-    <script src="{{ static_url_for('trato/static', 'i18n/pi.js') }}"></script>
-    <script src="{{ static_url_for('trato/static', 'i18n/ru.js') }}"></script>
-    <script src="{{ static_url_for('trato/static', 'i18n/zh.js') }}"></script>
-    <script src="{{ static_url_for('trato/static', 'i18n/ja.js') }}"></script>
-    <script src="{{ static_url_for('trato/static', 'i18n/nl.js') }}"></script>
-    <script src="{{ static_url_for('trato/static', 'i18n/es.js') }}"></script>
-    <script src="{{ static_url_for('trato/static', 'i18n/pt.js') }}"></script>
-    <script src="{{ static_url_for('trato/static', 'i18n/fr.js') }}"></script>
-    <script src="{{ static_url_for('trato/static', 'i18n/merge.js') }}"></script>
-    <script src="{{ static_url_for('trato/static', 'js/fiat_sats.js') }}"></script>
-    <script src="{{ static_url_for('trato/static', 'js/public_book.js') }}"></script>
+    <script src="{{ static_url_for('trato/static', 'js/avatar.js') }}?v={{ trato_version }}"></script>
+    <script src="{{ static_url_for('trato/static', 'js/orderbook_sort.js') }}?v={{ trato_version }}"></script>
+    <script src="{{ static_url_for('trato/static', 'js/book_filter_counts.js') }}?v={{ trato_version }}"></script>
+    <script src="{{ static_url_for('trato/static', 'i18n/en.js') }}?v={{ trato_version }}"></script>
+    <script src="{{ static_url_for('trato/static', 'i18n/pi.js') }}?v={{ trato_version }}"></script>
+    <script src="{{ static_url_for('trato/static', 'i18n/ru.js') }}?v={{ trato_version }}"></script>
+    <script src="{{ static_url_for('trato/static', 'i18n/zh.js') }}?v={{ trato_version }}"></script>
+    <script src="{{ static_url_for('trato/static', 'i18n/ja.js') }}?v={{ trato_version }}"></script>
+    <script src="{{ static_url_for('trato/static', 'i18n/nl.js') }}?v={{ trato_version }}"></script>
+    <script src="{{ static_url_for('trato/static', 'i18n/es.js') }}?v={{ trato_version }}"></script>
+    <script src="{{ static_url_for('trato/static', 'i18n/pt.js') }}?v={{ trato_version }}"></script>
+    <script src="{{ static_url_for('trato/static', 'i18n/fr.js') }}?v={{ trato_version }}"></script>
+    <script src="{{ static_url_for('trato/static', 'i18n/merge.js') }}?v={{ trato_version }}"></script>
+    <script src="{{ static_url_for('trato/static', 'js/fiat_sats.js') }}?v={{ trato_version }}"></script>
+    <script src="{{ static_url_for('trato/static', 'js/public_book.js') }}?v={{ trato_version }}"></script>
   </body>
 </html>

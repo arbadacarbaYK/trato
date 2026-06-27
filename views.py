@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import json
+from functools import lru_cache
 from http import HTTPStatus
+from pathlib import Path
 from typing import Annotated
 from uuid import UUID
 
@@ -29,6 +31,16 @@ from .services.payment_profiles import (
 trato_generic_router = APIRouter()
 
 _EXT_ID = "trato"
+_CONFIG_PATH = Path(__file__).resolve().parent / "config.json"
+
+
+@lru_cache(maxsize=1)
+def _extension_version() -> str:
+    try:
+        data = json.loads(_CONFIG_PATH.read_text(encoding="utf-8"))
+        return str(data.get("version") or "0")
+    except (OSError, json.JSONDecodeError):
+        return "0"
 
 
 def trato_renderer():
@@ -40,6 +52,7 @@ def _index_context(request: Request, *, public_view: bool = False, user=None) ->
         "request": request,
         "user": user.json() if user else None,
         "public_view": public_view,
+        "trato_version": _extension_version(),
         "payment_schema_json": json.dumps(PAYMENT_TYPE_SCHEMA),
         "country_names_json": json.dumps(COUNTRY_NAMES),
         "sepa_countries_json": json.dumps(sorted(SEPA_IBAN_COUNTRIES)),
@@ -161,5 +174,6 @@ async def public_orderbook(request: Request):
         {
             "request": request,
             "trade_url": trade_url,
+            "trato_version": _extension_version(),
         },
     )

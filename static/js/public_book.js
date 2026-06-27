@@ -33,6 +33,10 @@
   let takeablePlatforms = ['mostro', 'robosats']
   let dealsDefaultsApplied = false
   let userPickedDealsFilters = false
+  /** @type {string|null} null = user has not changed side yet */
+  let userSideChoice = null
+  /** @type {string|null} null = user has not changed currency yet */
+  let userFiatChoice = null
 
   if (!sectionsEl || !status || !refreshBtn) {
     if (status) {
@@ -206,6 +210,20 @@
     return keys.sort((a, b) => (codes[b] || 0) - (codes[a] || 0))[0]
   }
 
+  function enforceUserFilterChoices() {
+    if (!userPickedDealsFilters) return
+    if (sideSel && userSideChoice !== null) {
+      sideSel.value = userSideChoice
+    }
+    if (fiatSel && userFiatChoice !== null) {
+      const code = userFiatChoice
+      const ok =
+        code === '' ||
+        Array.from(fiatSel.options).some(o => o.value === code)
+      if (ok) fiatSel.value = code
+    }
+  }
+
   function applyDealsDefaults(stats, orders) {
     if (userPickedDealsFilters || dealsDefaultsApplied) return false
     if (!fiatSel || !sideSel) return false
@@ -227,29 +245,19 @@
   function renderBestDeals(orders, stats) {
     if (!dealsEl) return
     const fiatRaw = fiatSel && fiatSel.value
-    const side = sideSel && sideSel.value
-    const fiat = fiatRaw
-      ? fiatRaw.toUpperCase()
-      : pickDefaultFiat(stats || cachedStats, orders)
-    const chartSide = side || 'buy'
-    if (!fiat) {
+    const sideRaw = sideSel && sideSel.value
+    if (!fiatRaw || !sideRaw) {
       dealsEl.hidden = false
       dealsEl.innerHTML = `<section class="pb-deals-panel pb-deals-panel--hint" aria-live="polite">
         <p class="pb-deals-hint">${escapeHtml(
-          t('public_book.best_deals.loading')
+          t('public_book.best_deals.pick_filters')
         )}</p>
       </section>`
       return
     }
+    const fiat = fiatRaw.toUpperCase()
+    const chartSide = sideRaw
     let html = bestDealsHtml(orders, fiat, chartSide)
-    let activeSide = chartSide
-    if (!html && chartSide === 'buy') {
-      html = bestDealsHtml(orders, fiat, 'sell')
-      activeSide = 'sell'
-    } else if (!html && chartSide === 'sell') {
-      html = bestDealsHtml(orders, fiat, 'buy')
-      activeSide = 'buy'
-    }
     if (!html) {
       dealsEl.hidden = false
       dealsEl.innerHTML = `<section class="pb-deals-panel pb-deals-panel--hint" aria-live="polite">
@@ -261,12 +269,6 @@
     }
     dealsEl.hidden = false
     dealsEl.innerHTML = html
-    if (sideSel && !sideSel.value && activeSide) {
-      sideSel.value = activeSide
-    }
-    if (fiatSel && !fiatSel.value && fiat) {
-      fiatSel.value = fiat
-    }
   }
 
   function userActionDetail(side, fiatCode) {
@@ -698,12 +700,17 @@
       : fiatCounts(stats, orders)
     const prev = fiatSel.value
     fiatSel.innerHTML =
-      '<option value="">All</option>' +
+      '<option value="">All currencies</option>' +
       Object.keys(counts)
         .sort()
         .map(c => `<option value="${c}">${c} (${counts[c]})</option>`)
         .join('')
-    if (prev) fiatSel.value = prev
+    if (prev === '' || (prev && counts[prev.toUpperCase()])) {
+      fiatSel.value = prev === '' ? '' : prev.toUpperCase()
+    } else {
+      fiatSel.value = ''
+    }
+    enforceUserFilterChoices()
   }
 
   function isTakeableOrder(o) {
@@ -724,6 +731,7 @@
   }
 
   function filterLocal(orders) {
+    enforceUserFilterChoices()
     let list = orders
     if (sideSel && sideSel.value) {
       list = list.filter(o => userSide(o.kind) === sideSel.value)
@@ -795,6 +803,7 @@
   }
 
   function paintOrders(orders, stats) {
+    enforceUserFilterChoices()
     cachedOrders = orders
     if (stats) cachedStats = stats
     const visible = filterLocal(orders)
@@ -889,7 +898,11 @@
   ;[sideSel, fiatSel, settlementSel].forEach(el => {
     if (!el) return
     el.addEventListener('change', function () {
-      if (el === sideSel || el === fiatSel) userPickedDealsFilters = true
+      if (el === sideSel || el === fiatSel) {
+        userPickedDealsFilters = true
+        if (el === sideSel) userSideChoice = sideSel.value
+        if (el === fiatSel) userFiatChoice = fiatSel.value
+      }
       repaintLocal()
     })
   })
