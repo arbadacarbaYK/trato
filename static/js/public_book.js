@@ -672,19 +672,36 @@
     }
   }
 
+  function publicBookFilterContext() {
+    return {
+      side: sideSel && sideSel.value,
+      fiat: fiatSel && fiatSel.value,
+      settlement: settlementSel && settlementSel.value,
+      payment: null,
+      tratoOnly: false,
+      takeableOnly: takeableCb && takeableCb.checked,
+      isTakeable: isTakeableOrder,
+      platformTratoSupports: () => true,
+      matchMyPayments: false
+    }
+  }
+
   function populateFiat(stats, orders) {
     if (!fiatSel) return
-    const codes = { ...(stats.fiat_codes || {}) }
-    for (const o of orders) {
-      const c = (o.fiat_code || '').toUpperCase()
-      if (c) codes[c] = (codes[c] || 0) + 1
-    }
+    const FC = window.TratoBookFilterCounts
+    const ctx = publicBookFilterContext()
+    const filtered = FC
+      ? FC.filterOrdersForCounts(orders, ctx, 'fiat')
+      : orders
+    const counts = FC
+      ? FC.countByFiatCode(filtered)
+      : fiatCounts(stats, orders)
     const prev = fiatSel.value
     fiatSel.innerHTML =
       '<option value="">All</option>' +
-      Object.keys(codes)
+      Object.keys(counts)
         .sort()
-        .map(c => `<option value="${c}">${c} (${codes[c]})</option>`)
+        .map(c => `<option value="${c}">${c} (${counts[c]})</option>`)
         .join('')
     if (prev) fiatSel.value = prev
   }
@@ -798,6 +815,7 @@
   function repaintLocal() {
     if (!cachedOrders.length && !sectionsEl.querySelector('.pb-section')) return
     clientFilterBusy = true
+    populateFiat(cachedStats || {}, cachedOrders)
     if (cachedStats) updateStatsLine(cachedStats, cachedOrders)
     if (filterRepaintRaf) cancelAnimationFrame(filterRepaintRaf)
     filterRepaintRaf = requestAnimationFrame(() => {

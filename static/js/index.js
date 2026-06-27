@@ -205,7 +205,12 @@ window.app = Vue.createApp({
       orderbookRefreshing: false,
       orderbookFetched: false,
       clientFilterBusy: false,
-      _listClientFilters: {tratoOnly: true, matchMyPayments: false, payment: null},
+      _listClientFilters: {
+        tratoOnly: true,
+        matchMyPayments: false,
+        payment: null,
+        fiat: null
+      },
       _orderbookGen: 0,
       _oppositeHintGen: 0,
       _clientFilterRaf: null,
@@ -424,40 +429,41 @@ window.app = Vue.createApp({
     platformOptions() {
       return []
     },
-    fiatOptions() {
-      const codes = {...(this.stats.fiat_codes || {})}
-      for (const o of this.orders || []) {
-        const c = (o.fiat_code || '').trim().toUpperCase()
-        if (c) codes[c] = (codes[c] || 0) + 1
+    bookFilterContext() {
+      return {
+        side: this.filters.side,
+        fiat: this.filters.fiat,
+        settlement: this.filters.settlement,
+        payment: this.filters.payment,
+        tratoOnly: this.filters.tratoOnly,
+        takeableOnly: false,
+        matchMyPayments:
+          this.filters.matchMyPayments &&
+          this.paymentDetailsForm.profiles.length > 0,
+        isTakeable: () => true,
+        platformTratoSupports: o => this.platformTratoSupports(o),
+        orderMatchesMyPayments: o => this.orderMatchesMyPayments(o)
       }
-      return Object.keys(codes)
-        .sort()
-        .map(c => ({
-          label: `${c} (${codes[c]})`,
-          value: c
-        }))
+    },
+    fiatOptions() {
+      const FC = window.TratoBookFilterCounts
+      if (!FC) return []
+      const filtered = FC.filterOrdersForCounts(
+        this.orders,
+        this.bookFilterContext,
+        'fiat'
+      )
+      return FC.formatFiatOptions(FC.countByFiatCode(filtered))
     },
     paymentFilterOptions() {
-      const counts = {}
-      for (const o of this.orders || []) {
-        for (const pm of this.expandPaymentMethods(o.payment_methods)) {
-          const key = pm.trim()
-          if (key) counts[key] = (counts[key] || 0) + 1
-        }
-      }
-      const keys = Object.keys(counts)
-      const byFreqThenName = (a, b) => {
-        const diff = counts[b] - counts[a]
-        return diff !== 0 ? diff : a.localeCompare(b)
-      }
-      const ranked = keys.slice().sort(byFreqThenName)
-      const top10 = new Set(ranked.slice(0, 10))
-      const top = ranked.filter(k => top10.has(k))
-      const rest = keys.filter(k => !top10.has(k)).sort((a, b) => a.localeCompare(b))
-      return [...top, ...rest].map(label => ({
-        label: `${label} (${counts[label]})`,
-        value: label
-      }))
+      const FC = window.TratoBookFilterCounts
+      if (!FC) return []
+      const filtered = FC.filterOrdersForCounts(
+        this.orders,
+        this.bookFilterContext,
+        'payment'
+      )
+      return FC.formatPaymentOptions(FC.countByPaymentMethod(filtered))
     },
     bookRelayWarning() {
       const err = this.stats.last_error
@@ -554,6 +560,12 @@ window.app = Vue.createApp({
     visibleOrders() {
       const cf = this._listClientFilters
       let list = this.orders
+      if (cf.fiat) {
+        const fiat = String(cf.fiat).trim().toUpperCase()
+        list = list.filter(
+          o => (o.fiat_code || '').trim().toUpperCase() === fiat
+        )
+      }
       if (cf.tratoOnly) {
         list = list.filter(o => this.platformTratoSupports(o))
       }
@@ -1491,7 +1503,6 @@ window.app = Vue.createApp({
       this.orderbookRefreshing = hadOrders
       const params = new URLSearchParams()
       if (this.filters.side) params.append('side', this.filters.side)
-      if (this.filters.fiat) params.append('fiat', this.filters.fiat)
       if (this.filters.settlement) params.append('settlement', this.filters.settlement)
       if (this.settings.demo_mode) params.append('demo_seed', '1')
       LNbits.api
@@ -1532,7 +1543,8 @@ window.app = Vue.createApp({
         this._listClientFilters = {
           tratoOnly: this.filters.tratoOnly,
           matchMyPayments: this.filters.matchMyPayments,
-          payment: this.filters.payment
+          payment: this.filters.payment,
+          fiat: this.filters.fiat
         }
         this.clientFilterBusy = false
         this.refreshOppositeSideHint()
@@ -1555,7 +1567,6 @@ window.app = Vue.createApp({
       const opposite = this.oppositeSide(side)
       const params = new URLSearchParams()
       params.append('side', opposite)
-      if (this.filters.fiat) params.append('fiat', this.filters.fiat)
       if (this.filters.settlement) params.append('settlement', this.filters.settlement)
       if (this.settings.demo_mode) params.append('demo_seed', '1')
       LNbits.api
@@ -1566,6 +1577,12 @@ window.app = Vue.createApp({
           }
           let list = tratoApiPayload(res) || []
           const cf = this._listClientFilters
+          if (cf.fiat) {
+            const fiat = String(cf.fiat).trim().toUpperCase()
+            list = list.filter(
+              o => (o.fiat_code || '').trim().toUpperCase() === fiat
+            )
+          }
           if (cf.tratoOnly) {
             list = list.filter(o => this.platformTratoSupports(o))
           }
@@ -2236,11 +2253,16 @@ window.app = Vue.createApp({
           return
         }
         const n = val.toLowerCase()
-        this.paymentFilterOptionsFiltered = all.filter(
-          o =>
-            o.label.toLowerCase().includes(n) ||
-            o.value.toLowerCase().includes(n)
-        )
+        this.paymentFilterOptionsFiltered = all.filter(o => {
+          const hay = [
+            o.label,
+            o.value,
+            o.fullLabel || ''
+          ]
+            .join(' ')
+            .toLowerCase()
+          return hay.includes(n)
+        })
       })
     },
     loadHealth() {
@@ -4523,6 +4545,7 @@ window.app = Vue.createApp({
     },
     'filters.fiat'() {
       this.loadMarketPrice()
+      this.scheduleClientFilterRepaint()
     },
     'filters.tratoOnly'() {
       this.scheduleClientFilterRepaint()

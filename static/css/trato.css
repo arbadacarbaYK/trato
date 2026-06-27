@@ -7,6 +7,40 @@ html.trato-icons-pending .trato-page .q-icon {
   visibility: hidden;
 }
 
+/* No document scrollbar during icon-font load (inline head CSS mirrors this). */
+html.trato-icons-pending {
+  overflow: hidden;
+}
+
+/* Hide raw template (all tabs + dialogs) until Vue compiles v-if / q-tab-panels. */
+.trato-page[v-cloak] {
+  display: none;
+}
+
+/* Dark-theme scrollbars — avoids white OS scrollbar on body--dark. */
+body.body--dark {
+  scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
+  scrollbar-width: thin;
+}
+
+body.body--dark ::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+body.body--dark ::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+body.body--dark ::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.18);
+  border-radius: 5px;
+}
+
+body.body--dark ::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.28);
+}
+
 .trato-page {
   width: 100%;
   max-width: none;
@@ -868,6 +902,24 @@ body.body--dark .trato-book-info-banner strong {
 
 .trato-book-filters__payment .q-field__control {
   min-width: 0;
+}
+
+.trato-filter-menu {
+  max-width: min(420px, 92vw);
+}
+
+.trato-filter-option-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+.trato-book-filters__payment .q-field__native > span,
+.trato-book-filters__payment .q-field__input {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .trato-book-toolbar {

@@ -17,6 +17,13 @@
   html.trato-icons-pending .trato-page .q-icon {
     visibility: hidden;
   }
+  /* Critical: hide stacked tab/dialog markup until Vue compiles; no scrollbar flash. */
+  html.trato-icons-pending {
+    overflow: hidden;
+  }
+  .trato-page[v-cloak] {
+    display: none;
+  }
 </style>
 {% endblock %}
 {% block head_scripts %}
@@ -53,6 +60,7 @@
 <script src="{{ static_url_for('trato/static', 'js/fiat_sats.js') }}"></script>
 <script src="{{ static_url_for('trato/static', 'js/avatar.js') }}"></script>
 <script src="{{ static_url_for('trato/static', 'js/orderbook_sort.js') }}"></script>
+<script src="{{ static_url_for('trato/static', 'js/book_filter_counts.js') }}"></script>
 <script src="{{ static_url_for('trato/static', 'i18n/en.js') }}"></script>
 <script src="{{ static_url_for('trato/static', 'i18n/pi.js') }}"></script>
 <script src="{{ static_url_for('trato/static', 'i18n/ru.js') }}"></script>
@@ -65,7 +73,7 @@
 <script src="{{ static_url_for('trato/static', 'i18n/merge.js') }}"></script>
 <script src="{{ static_url_for('trato/static', 'js/index.js') }}"></script>
 {% endblock %} {% block page %} {% raw %}
-<div class="trato-page">
+<div class="trato-page" v-cloak>
   <div class="trato-app-header">
   <!-- Header -->
   <div class="row items-center trato-header">
@@ -237,7 +245,7 @@
           class="trato-book-filters__compact trato-book-filters__fiat"
           @filter="filterFiatOptions"
           @popup-show="primeFiatFilterOptions"
-          @update:model-value="loadOrderbook"
+          @update:model-value="scheduleClientFilterRepaint"
         ></q-select>
         <q-select
           v-model="filters.settlement"
@@ -265,9 +273,22 @@
           use-input
           input-debounce="0"
           class="trato-book-filters__payment"
+          popup-content-class="trato-filter-menu"
           @filter="filterPaymentOptions"
           @popup-show="primePaymentFilterOptions"
         >
+          <template v-slot:option="scope">
+            <q-item v-bind="scope.itemProps">
+              <q-item-section>
+                <q-item-label
+                  class="trato-filter-option-label"
+                  :title="scope.opt.fullLabel || scope.opt.value"
+                >
+                  {{ scope.opt.label }}
+                </q-item-label>
+              </q-item-section>
+            </q-item>
+          </template>
           <template v-slot:no-option>
             <q-item>
               <q-item-section class="text-grey">
