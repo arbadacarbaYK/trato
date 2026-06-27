@@ -203,13 +203,14 @@ window.app = Vue.createApp({
       },
       robosatsCoordinatorOptions: [],
       orderbookRefreshing: false,
+      orderbookFetched: false,
       clientFilterBusy: false,
       _listClientFilters: {tratoOnly: true, matchMyPayments: false, payment: null},
       _orderbookGen: 0,
       _oppositeHintGen: 0,
       _clientFilterRaf: null,
       loading: {
-        orderbook: false,
+        orderbook: true,
         identity: false,
         settings: false,
         create: false,
@@ -522,16 +523,22 @@ window.app = Vue.createApp({
       const entries = Object.entries(platforms).sort((a, b) => b[1] - a[1])
       return entries.map(([p, n]) => `${this.platformLabel(p)} ${n}`)
     },
+    orderbookReady() {
+      return (
+        this.orderbookFetched &&
+        !this.loading.orderbook &&
+        !this.orderbookRefreshing
+      )
+    },
     noTakeableOffersInBook() {
       return (
-        !this.loading.orderbook &&
-        !this.orderbookRefreshing &&
+        this.orderbookReady &&
         this.stats.total > 0 &&
         (this.stats.takeable || 0) === 0
       )
     },
     bookFiatEmptyHint() {
-      if (this.loading.orderbook || this.orders.length > 0) return ''
+      if (!this.orderbookReady || this.orders.length > 0) return ''
       const code = (this.filters.fiat || '').trim().toUpperCase()
       if (!code) return ''
       const n = (this.stats.fiat_codes && this.stats.fiat_codes[code]) || 0
@@ -1510,6 +1517,7 @@ window.app = Vue.createApp({
         })
         .finally(() => {
           if (gen !== this._orderbookGen) return
+          this.orderbookFetched = true
           this.loading.orderbook = false
           this.orderbookRefreshing = false
           this.refreshOppositeSideHint()

@@ -402,7 +402,7 @@
       </q-banner>
 
       <q-banner
-        v-if="!loading.orderbook && orders.length === 0"
+        v-if="orderbookReady && orders.length === 0"
         class="trato-book-empty-banner rounded-borders q-mb-md"
       >
         <template v-slot:avatar>
@@ -415,7 +415,7 @@
       </q-banner>
 
       <div
-        v-if="loading.orderbook && orders.length === 0"
+        v-if="!orderbookReady && orders.length === 0"
         class="text-center q-pa-xl"
       >
         <q-spinner-bars color="primary" size="42px"></q-spinner-bars>
@@ -423,6 +423,7 @@
       </div>
 
       <!-- Buy / Sell sections (not one mixed list) -->
+      <template v-if="orderbookReady || visibleOrders.length > 0">
       <template v-for="section in orderBookSections" :key="section.key">
         <div class="q-mb-lg">
           <div class="row items-end q-mb-sm">
@@ -437,9 +438,9 @@
           </div>
 
           <q-banner
-            v-if="section.orders.length === 0"
+            v-if="orderbookReady && section.orders.length === 0"
             dense
-            class="bg-grey-2 text-grey-8 rounded-borders q-mb-sm"
+            class="trato-book-empty-banner rounded-borders q-mb-sm"
           >
             {{ sectionEmptyMessage(section) }}
           </q-banner>
@@ -700,6 +701,7 @@
           </q-card>
           </div>
         </div>
+      </template>
       </template>
     </q-tab-panel>
 
