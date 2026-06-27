@@ -1,0 +1,2971 @@
+{% extends "base.html" %} {% from "macros.jinja" import window_vars with context %}
+{% block scripts %}
+{% if public_view %}
+<script>
+  window.g = { user: null };
+  window.TRATO_PUBLIC = true;
+</script>
+{% else %}
+{{ window_vars(user) }}
+{% endif %}
+<script>
+  window.TRATO_PAYMENT_SCHEMA = {{ payment_schema_json | safe }};
+  window.TRATO_COUNTRY_NAMES = {{ country_names_json | safe }};
+  window.TRATO_SEPA_COUNTRIES = {{ sepa_countries_json | safe }};
+  window.TRATO_MOBILE_MONEY_COUNTRIES = {{ mobile_money_countries_json | safe }};
+  window.TRATO_ICON_URL = "{{ static_url_for('trato/static', 'image/trato.png') }}";
+</script>
+<link
+  rel="stylesheet"
+  href="{{ static_url_for('trato/static', 'css/trato.css') }}"
+/>
+<script src="{{ static_url_for('trato/static', 'js/avatar.js') }}"></script>
+<script src="{{ static_url_for('trato/static', 'js/orderbook_sort.js') }}"></script>
+<script src="{{ static_url_for('trato/static', 'i18n/en.js') }}"></script>
+<script src="{{ static_url_for('trato/static', 'i18n/pi.js') }}"></script>
+<script src="{{ static_url_for('trato/static', 'i18n/merge.js') }}"></script>
+<script src="{{ static_url_for('trato/static', 'js/index.js') }}"></script>
+{% endblock %} {% block page %} {% raw %}
+<div class="trato-page">
+  <div class="trato-app-header">
+  <!-- Header -->
+  <div class="row items-center trato-header">
+    <div class="col">
+      <div class="row items-center no-wrap">
+        <img
+          v-if="tratoIconUrl"
+          :src="tratoIconUrl"
+          alt=""
+          class="trato-logo q-mr-sm"
+          width="40"
+          height="40"
+        />
+        <div class="text-h4 text-weight-bold trato-wordmark">{{ $t('trato.wordmark') }}</div>
+        <q-badge
+          v-if="isPublicView"
+          color="grey-7"
+          class="q-ml-sm"
+          :label="$t('trato.badges.browse')"
+        ></q-badge>
+        <q-badge
+          v-else-if="isDemoMode"
+          color="orange-8"
+          class="q-ml-sm"
+          :label="$t('trato.badges.demo')"
+        ></q-badge>
+        <q-badge
+          v-else
+          color="green-7"
+          class="q-ml-sm"
+          :label="$t('trato.badges.live')"
+        ></q-badge>
+      </div>
+      <div class="text-caption text-grey">{{ $t('trato.tagline') }}</div>
+    </div>
+  </div>
+
+  <div class="trato-header-nav">
+    <q-tabs
+      v-if="!isPublicView"
+      v-model="tab"
+      class="text-primary trato-tabs"
+      active-color="primary"
+      indicator-color="primary"
+      align="left"
+      inline-label
+      no-caps
+      dense
+    >
+      <q-tab name="book" icon="storefront" :label="$t('trato.tabs.book')"></q-tab>
+      <q-tab name="trades" icon="receipt_long" :label="$t('trato.tabs.trades')"></q-tab>
+      <q-tab name="identity" icon="vpn_key" :label="$t('trato.tabs.identity')"></q-tab>
+      <q-tab name="settings" icon="tune" :label="$t('trato.tabs.settings')"></q-tab>
+    </q-tabs>
+    <div class="trato-header-actions">
+      <q-btn
+        flat
+        round
+        icon="refresh"
+        :loading="loading.orderbook || orderbookRefreshing"
+        @click="loadOrderbook"
+      >
+        <q-tooltip>{{ $t('trato.tooltips.refresh_book') }}</q-tooltip>
+      </q-btn>
+      <q-btn
+        v-if="!isPublicView"
+        flat
+        round
+        icon="share"
+      >
+        <q-tooltip>{{ $t('trato.tooltips.share_public') }}</q-tooltip>
+        <q-menu anchor="bottom right" self="top right" class="trato-share-menu">
+          <q-list dense style="min-width: 260px">
+            <q-item-label header class="text-weight-medium">
+              {{ $t('trato.share.header') }}
+            </q-item-label>
+            <q-item-label caption class="q-px-md q-pb-sm">
+              {{ $t('trato.share.caption') }}
+            </q-item-label>
+            <q-item clickable v-close-popup @click="copyText(publicBookUrl)">
+              <q-item-section avatar>
+                <q-icon name="content_copy" color="primary"></q-icon>
+              </q-item-section>
+              <q-item-section>{{ $t('trato.share.copy') }}</q-item-section>
+            </q-item>
+            <q-item clickable v-close-popup @click="openPublicBook">
+              <q-item-section avatar>
+                <q-icon name="open_in_new" color="primary"></q-icon>
+              </q-item-section>
+              <q-item-section>{{ $t('trato.share.preview') }}</q-item-section>
+            </q-item>
+            <q-separator class="q-my-xs"></q-separator>
+            <q-item dense class="trato-share-url-item">
+              <q-item-section>
+                <div class="text-caption text-grey ellipsis">{{ publicBookUrl }}</div>
+              </q-item-section>
+            </q-item>
+          </q-list>
+        </q-menu>
+      </q-btn>
+    </div>
+  </div>
+  </div>
+
+  <q-banner
+    v-if="isPublicView"
+    class="bg-blue-1 text-blue-10 rounded-borders q-mb-md"
+    dense
+  >
+    <strong>{{ $t('trato.public_banner.title') }}</strong>
+    {{ $t('trato.public_banner.body') }}
+    <a :href="loginPath" class="text-primary text-weight-medium">{{ $t('trato.public_banner.login_link') }}</a>
+    {{ $t('trato.public_banner.body_after') }}
+  </q-banner>
+
+  <q-separator class="q-mb-md"></q-separator>
+
+  <q-tab-panels v-model="tab" animated class="trato-panels">
+    <!-- ============ ORDER BOOK ============ -->
+    <q-tab-panel name="book" class="q-pa-none">
+      <q-banner
+        v-if="appLoadWarning"
+        class="bg-red-1 text-red-10 rounded-borders q-mb-md"
+        dense
+      >
+        <template v-slot:avatar>
+          <q-icon name="error_outline" color="negative"></q-icon>
+        </template>
+        {{ appLoadWarning }}
+      </q-banner>
+
+      <q-banner
+        v-if="bookRelayWarning"
+        class="bg-orange-1 text-orange-10 rounded-borders q-mb-md"
+        dense
+      >
+        <template v-slot:avatar>
+          <q-icon name="cloud_off" color="orange-9"></q-icon>
+        </template>
+        {{ bookRelayWarning }}
+      </q-banner>
+
+      <div class="trato-book-filters q-mb-sm">
+        <q-select
+          v-model="filters.side"
+          :options="sideOptions"
+          :label="$t('trato.filters.i_want_to')"
+          dense
+          outlined
+          hide-bottom-space
+          emit-value
+          map-options
+          clearable
+          class="trato-book-filters__side"
+          @update:model-value="loadOrderbook"
+        ></q-select>
+        <q-select
+          v-model="filters.fiat"
+          :options="fiatOptionsFiltered.length ? fiatOptionsFiltered : fiatOptions"
+          :label="$t('trato.filters.currency')"
+          dense
+          outlined
+          hide-bottom-space
+          emit-value
+          map-options
+          clearable
+          use-input
+          input-debounce="0"
+          class="trato-book-filters__compact trato-book-filters__fiat"
+          @filter="filterFiatOptions"
+          @popup-show="primeFiatFilterOptions"
+          @update:model-value="loadOrderbook"
+        ></q-select>
+        <q-select
+          v-model="filters.settlement"
+          :options="settlementOptions"
+          :label="$t('trato.filters.settlement')"
+          dense
+          outlined
+          hide-bottom-space
+          emit-value
+          map-options
+          clearable
+          class="trato-book-filters__compact trato-book-filters__settlement"
+          @update:model-value="loadOrderbook"
+        ></q-select>
+        <q-select
+          v-model="filters.payment"
+          :options="paymentFilterOptionsFiltered.length ? paymentFilterOptionsFiltered : paymentFilterOptions"
+          :label="$t('trato.filters.payment_method')"
+          dense
+          outlined
+          hide-bottom-space
+          emit-value
+          map-options
+          clearable
+          use-input
+          input-debounce="0"
+          class="trato-book-filters__payment"
+          @filter="filterPaymentOptions"
+          @popup-show="primePaymentFilterOptions"
+        >
+          <template v-slot:no-option>
+            <q-item>
+              <q-item-section class="text-grey">
+                {{ $t('trato.filters.payment_method_empty') }}
+              </q-item-section>
+            </q-item>
+          </template>
+        </q-select>
+        <q-select
+          v-model="filters.sort"
+          :options="sortOptions"
+          :label="$t('trato.filters.sort_by')"
+          dense
+          outlined
+          hide-bottom-space
+          emit-value
+          map-options
+          class="trato-book-filters__compact trato-book-filters__sort"
+          @update:model-value="onOrderbookSortChange"
+        ></q-select>
+      </div>
+
+      <div class="trato-book-toolbar q-mb-sm">
+        <div class="trato-book-toolbar__main">
+          <div class="trato-book-toggles">
+            <q-toggle
+              v-model="filters.tratoOnly"
+              dense
+              color="primary"
+              :label="$t('trato.filters.trato_only')"
+            >
+              <q-tooltip max-width="300px">
+                {{ $t('trato.tooltips.toggle_trato_only') }}
+              </q-tooltip>
+            </q-toggle>
+            <q-toggle
+              v-if="paymentDetailsForm.profiles.length"
+              v-model="filters.matchMyPayments"
+              dense
+              color="teal"
+              :label="$t('trato.filters.match_payments')"
+            >
+              <q-tooltip max-width="280px">
+                {{ $t('trato.tooltips.toggle_match_payments') }}
+              </q-tooltip>
+            </q-toggle>
+          </div>
+          <div class="trato-book-toolbar__meta text-caption trato-filter-meta">
+            {{ orderBookMetaLine }}
+          </div>
+        </div>
+        <div class="trato-book-toolbar__price row items-center no-wrap">
+          <q-chip
+            dense
+            outline
+            color="amber-9"
+            icon="currency_bitcoin"
+            class="trato-btc-price-chip"
+          >
+            <q-tooltip max-width="300px">{{ marketPriceSourceHint() }}</q-tooltip>
+            <span v-if="marketPrice.loading">{{ $t('trato.market.loading_price') }}</span>
+            <span v-else-if="marketPrice.btc_price">
+              {{ $t('trato.market.btc_line', { price: formatMarketBtc(), fiat: marketPrice.fiat_code }) }}
+              <span class="trato-filter-meta">
+                {{ $t('trato.market.fiat_line', { fiat: marketPrice.fiat_code, sats: formatSats(marketPrice.sats_per_fiat) }) }}
+              </span>
+            </span>
+            <span v-else class="text-grey">{{ $t('trato.market.price_unavailable') }}</span>
+          </q-chip>
+          <q-btn
+            flat
+            dense
+            round
+            size="sm"
+            icon="refresh"
+            :loading="marketPrice.loading"
+            @click="loadMarketPrice"
+          >
+            <q-tooltip>{{ $t('trato.tooltips.refresh_rate') }}</q-tooltip>
+          </q-btn>
+        </div>
+      </div>
+
+      <div
+        v-if="intentFilterHint"
+        class="text-caption text-grey q-mb-sm trato-book-filter-hint"
+      >
+        {{ intentFilterHint }}
+      </div>
+
+      <q-banner
+        v-if="oppositeSideOfferBanner"
+        class="bg-amber-1 text-amber-10 rounded-borders q-mb-md"
+        dense
+      >
+        {{ oppositeSideOfferBanner }}
+      </q-banner>
+
+      <q-banner
+        v-if="bookFiatEmptyHint"
+        class="trato-book-empty-banner rounded-borders q-mb-md"
+        dense
+      >
+        <template v-slot:avatar>
+          <q-icon name="euro" color="grey-7"></q-icon>
+        </template>
+        {{ bookFiatEmptyHint }}
+      </q-banner>
+
+      <q-banner
+        v-if="noTakeableOffersInBook && filters.tratoOnly"
+        class="trato-book-info-banner rounded-borders q-mb-md"
+        dense
+      >
+        <template v-slot:avatar>
+          <q-icon name="info" color="primary"></q-icon>
+        </template>
+        <strong>{{ $t('trato.orderbook.no_mostro_trato_only_title') }}</strong>
+        {{ $t('trato.orderbook.no_mostro_trato_only_body', { summary: bookPlatformSummary.join(' · ') }) }}
+      </q-banner>
+
+      <q-banner
+        v-if="noTakeableOffersInBook && !filters.tratoOnly"
+        class="trato-book-info-banner rounded-borders q-mb-md"
+        dense
+      >
+        <template v-slot:avatar>
+          <q-icon name="info" color="primary"></q-icon>
+        </template>
+        <strong>{{ $t('trato.orderbook.no_mostro_title') }}</strong>
+        {{ $t('trato.orderbook.no_mostro_body', { summary: bookPlatformSummary.join(' · ') }) }}
+      </q-banner>
+
+      <q-banner
+        v-if="!loading.orderbook && orders.length === 0"
+        class="trato-book-empty-banner rounded-borders q-mb-md"
+      >
+        <template v-slot:avatar>
+          <q-icon name="hourglass_empty" color="grey-7"></q-icon>
+        </template>
+        {{ $t('trato.orderbook.no_matching') }}
+        <span v-if="stats.last_error">
+          {{ $t('trato.orderbook.relay_error', { error: stats.last_error }) }}
+        </span>
+      </q-banner>
+
+      <div
+        v-if="loading.orderbook && orders.length === 0"
+        class="text-center q-pa-xl"
+      >
+        <q-spinner-bars color="primary" size="42px"></q-spinner-bars>
+        <div class="text-caption text-grey q-mt-sm">{{ $t('trato.orderbook.loading') }}</div>
+      </div>
+
+      <!-- Buy / Sell sections (not one mixed list) -->
+      <template v-for="section in orderBookSections" :key="section.key">
+        <div class="q-mb-lg">
+          <div class="row items-end q-mb-sm">
+            <div class="col">
+              <div class="text-subtitle1 text-weight-bold">{{ section.title }}</div>
+              <div class="text-caption text-grey">{{ section.subtitle }}</div>
+            </div>
+            <div class="text-caption text-grey">
+              {{ section.count }}
+              {{ section.count === 1 ? $t('trato.orderbook.offer') : $t('trato.orderbook.offers') }}
+            </div>
+          </div>
+
+          <q-banner
+            v-if="section.orders.length === 0"
+            dense
+            class="bg-grey-2 text-grey-8 rounded-borders q-mb-sm"
+          >
+            {{ sectionEmptyMessage(section) }}
+          </q-banner>
+
+          <div v-else class="trato-order-grid">
+            <q-card
+              v-for="o in section.orders"
+              :key="o.mostro_pubkey + ':' + o.id"
+              flat
+              bordered
+              class="trato-order-card full-height"
+            >
+            <q-card-section class="q-pb-xs">
+              <div class="row items-center no-wrap">
+                <q-chip
+                  :color="userChipColor(userSideIfTake(o.kind))"
+                  text-color="white"
+                  dense
+                  square
+                  class="text-weight-bold q-ml-none"
+                >
+                  {{ userActionLabel(userSideIfTake(o.kind)) }}
+                </q-chip>
+                <q-chip
+                  dense
+                  square
+                  outline
+                  :color="platformTratoSupports(o) ? 'primary' : 'grey-6'"
+                  size="sm"
+                >
+                  {{ platformLabel(o.platform) }}
+                  <q-tooltip max-width="300px">
+                    <span v-if="platformTratoSupports(o)">
+                      {{ $t('trato.orderbook.platform_take', { platform: platformLabel(o.platform) }) }}
+                      <span v-if="!canTakeOrder(o)">{{ $t('trato.orderbook.platform_take_setup') }}</span>.
+                    </span>
+                    <span v-else>
+                      {{ $t('trato.orderbook.platform_browse', { platform: platformLabel(o.platform) }) }}
+                    </span>
+                  </q-tooltip>
+                </q-chip>
+                <q-space></q-space>
+              </div>
+              <div class="text-caption text-weight-medium text-grey-5 q-mt-xs">
+                {{ orderCardActionDetail(o) }}
+              </div>
+            </q-card-section>
+
+            <q-card-section class="q-py-xs">
+              <div class="text-h6 text-weight-bold">{{ o.fiat_display }}</div>
+              <div class="text-caption text-grey">
+                <span v-if="o.is_market_price">market price</span>
+                <span v-else>{{ formatSats(o.amount_sats) }} sats</span>
+                <span v-if="premiumLabel(o.premium)">
+                  · {{ premiumLabel(o.premium) }} vs market
+                </span>
+              </div>
+            </q-card-section>
+
+            <!-- Maker profile (Nostr name + avatar when available) -->
+            <q-card-section
+              v-if="orderMakerLabel(o) || o.maker_name || o.maker_pubkey"
+              class="q-py-xs"
+            >
+              <div class="row items-center no-wrap q-gutter-sm">
+                <q-avatar
+                  size="32px"
+                  :key="orderAvatarKey(o)"
+                  :class="{
+                    'trato-avatar-link': njumpProfileUrl(o.maker_pubkey)
+                  }"
+                  @click.stop="avatarNjumpClick(o.maker_pubkey)"
+                >
+                  <img
+                    :src="orderAvatarSrc(o)"
+                    :alt="orderMakerLabel(o)"
+                    referrerpolicy="no-referrer"
+                    loading="lazy"
+                    decoding="async"
+                    @error="onAvatarError(orderAvatarKey(o))"
+                  >
+                  <q-tooltip v-if="njumpProfileUrl(o.maker_pubkey)">
+                    View Nostr profile on njump
+                  </q-tooltip>
+                </q-avatar>
+                <div class="col ellipsis">
+                  <div class="text-body2 text-weight-medium ellipsis">
+                    {{ orderMakerLabel(o) }}
+                  </div>
+                  <div
+                    v-if="profileSocial(o.maker_pubkey)"
+                    class="text-caption text-grey-6 ellipsis"
+                  >
+                    {{ profileSocial(o.maker_pubkey).line }}
+                    <q-tooltip max-width="280px">
+                      {{ profileSocial(o.maker_pubkey).tooltip }}
+                    </q-tooltip>
+                  </div>
+                </div>
+              </div>
+            </q-card-section>
+
+            <!-- Reputation badges -->
+            <q-card-section v-if="repBadgesRowVisible(o)" class="q-py-none">
+              <div class="row items-center no-wrap q-gutter-xs trato-rep-badges">
+                <q-badge
+                  v-if="repReputationBadge(repInfo(o)).show"
+                  :color="repReputationBadge(repInfo(o)).color"
+                  text-color="white"
+                  class="trato-rep-badge"
+                >
+                  <q-icon
+                    v-if="repReputationBadge(repInfo(o)).icon"
+                    :name="repReputationBadge(repInfo(o)).icon"
+                    size="11px"
+                    class="q-mr-xs"
+                  ></q-icon>
+                  {{ repReputationBadge(repInfo(o)).label }}
+                  <q-tooltip max-width="280px">
+                    {{ repReputationBadge(repInfo(o)).tooltip }}
+                  </q-tooltip>
+                </q-badge>
+                <q-badge
+                  v-if="repTradesBadge(repInfo(o)).show"
+                  :color="repTradesBadge(repInfo(o)).color"
+                  text-color="white"
+                  class="trato-rep-badge"
+                >
+                  {{ repTradesBadge(repInfo(o)).label }}
+                  <q-tooltip max-width="280px">
+                    {{ repTradesBadge(repInfo(o)).tooltip }}
+                  </q-tooltip>
+                </q-badge>
+                <q-badge
+                  v-if="repTrustBadge(repInfo(o)).show"
+                  :color="repTrustBadge(repInfo(o)).color"
+                  text-color="white"
+                  class="trato-rep-badge"
+                >
+                  {{ repTrustBadge(repInfo(o)).label }}
+                  <q-tooltip max-width="280px">
+                    {{ repTrustBadge(repInfo(o)).tooltip }}
+                  </q-tooltip>
+                </q-badge>
+                <q-space></q-space>
+                <q-chip
+                  v-if="o.book_verified && String(o.platform || 'mostro').toLowerCase() !== 'mostro'"
+                  dense
+                  square
+                  color="blue-2"
+                  text-color="blue-9"
+                  icon="verified"
+                  size="sm"
+                >
+                  {{ t('orderbook.verified_chip') }}
+                  <q-tooltip max-width="260px">
+                    {{ t('orderbook.verified_tooltip') }}
+                  </q-tooltip>
+                </q-chip>
+                <q-chip
+                  v-if="o.book_verified === false && String(o.platform || 'mostro').toLowerCase() !== 'mostro'"
+                  dense
+                  square
+                  color="orange-2"
+                  text-color="orange-10"
+                  icon="cloud_off"
+                  size="sm"
+                >
+                  {{ t('orderbook.unverified_chip') }}
+                  <q-tooltip max-width="260px">
+                    {{ t('orderbook.unverified_tooltip') }}
+                  </q-tooltip>
+                </q-chip>
+                <q-chip
+                  v-if="repInfo(o).bonded"
+                  dense
+                  square
+                  color="green-2"
+                  text-color="green-9"
+                  icon="savings"
+                  size="sm"
+                >
+                  Bonded
+                  <q-tooltip max-width="260px">
+                    Maker posted a refundable Lightning security bond. If they
+                    no-show, the bond can be slashed — not the same as ID verified.
+                  </q-tooltip>
+                </q-chip>
+              </div>
+              <div
+                v-if="repInfo(o).name && !profileLabel(o.maker_pubkey, o.maker_name)"
+                class="text-caption trato-filter-meta ellipsis q-mt-xs"
+              >
+                {{ repInfo(o).name }}
+              </div>
+            </q-card-section>
+
+            <q-card-section
+              class="q-py-xs trato-pm-section"
+              v-if="expandPaymentMethods(o.payment_methods).length"
+            >
+              <div class="trato-pm-row">
+                <q-chip
+                  v-for="(pm, i) in paymentMethodsDisplay(o)"
+                  :key="i"
+                  square
+                  class="trato-pm-chip"
+                >
+                  <span class="trato-pm-chip__text">{{ pm }}</span>
+                  <q-tooltip v-if="pm.length > 28" max-width="320px">{{ pm }}</q-tooltip>
+                </q-chip>
+                <q-chip
+                  v-if="paymentMethodsMoreCount(o)"
+                  square
+                  class="trato-pm-chip trato-pm-chip--more"
+                >
+                  +{{ paymentMethodsMoreCount(o) }}
+                  <q-tooltip max-width="360px">{{ paymentMethodsFullLabel(o) }}</q-tooltip>
+                </q-chip>
+              </div>
+              <div
+                v-if="matchingPaymentLabels(o).length && userSideIfTake(o.kind) === 'buy'"
+                class="trato-pm-match q-mt-xs ellipsis-2-lines"
+              >
+                <q-icon name="check_circle" size="13px"></q-icon>
+                You can pay: {{ matchingPaymentLabels(o).join(', ') }}
+              </div>
+            </q-card-section>
+
+            <q-card-actions align="right">
+              <q-btn flat dense color="grey-7" icon="info" @click="showOrder(o)">
+                <q-tooltip>Details</q-tooltip>
+              </q-btn>
+              <q-btn
+                v-if="platformTratoSupports(o)"
+                unelevated
+                :color="canTakeOrder(o) ? 'primary' : 'orange-8'"
+                no-caps
+                :label="takeButtonLabel(o)"
+                @click="explainTakeOrder(o)"
+              ></q-btn>
+              <q-btn
+                v-else
+                flat
+                no-caps
+                color="grey-7"
+                :label="openPlatformLabel(o.platform)"
+                @click="explainTakeOrder(o)"
+              ></q-btn>
+            </q-card-actions>
+          </q-card>
+          </div>
+        </div>
+      </template>
+    </q-tab-panel>
+
+    <!-- ============ MY TRADES ============ -->
+    <q-tab-panel name="trades" class="q-pa-none">
+      <div class="row items-center q-mb-md">
+        <div class="text-h6 col">{{ $t('trato.tabs.trades') }}</div>
+        <q-btn
+          v-if="visibleMyOrders.length"
+          flat
+          no-caps
+          color="grey-8"
+          icon="download"
+          :label="$t('trato.buttons.export_taxes')"
+          class="q-mr-sm"
+          :loading="loading.taxExport"
+          @click="exportTradesForTaxes"
+        ></q-btn>
+        <q-btn
+          v-if="isDemoMode && visibleMyOrders.length"
+          flat
+          no-caps
+          color="negative"
+          icon="delete_sweep"
+          :label="$t('trato.buttons.clear_demo', { count: visibleMyOrders.length })"
+          class="q-mr-sm"
+          @click="purgeAllDemoOrders"
+        ></q-btn>
+        <q-btn
+          v-if="!isPublicView"
+          unelevated
+          color="primary"
+          no-caps
+          icon="add"
+          :label="$t('trato.buttons.create_order')"
+          :disable="!identity"
+          @click="openCreate"
+        ></q-btn>
+      </div>
+      <q-banner
+        v-if="!identity"
+        class="bg-orange-1 text-orange-9 rounded-borders q-mb-md"
+      >
+        Open the Identity tab and pick a wallet to start trading.
+      </q-banner>
+
+      <div
+        v-if="visibleMyOrders.length === 0"
+        class="text-center text-grey q-pa-xl"
+      >
+        <q-icon name="receipt_long" size="42px" color="grey-5"></q-icon>
+        <div class="q-mt-sm">
+          No {{ isDemoMode ? 'demo' : 'live' }} trades yet.
+          Take an order or create one.
+        </div>
+      </div>
+
+      <div class="trato-order-grid">
+        <q-card
+          v-for="t in visibleMyOrders"
+          :key="t.id"
+          flat
+          bordered
+          class="trato-order-card full-height cursor-pointer"
+          :class="{'trato-order-card--active': t.id === tradesFocusId}"
+          @click="openTrade(t)"
+        >
+            <q-card-section class="q-pb-xs">
+              <div class="row items-center no-wrap">
+                <q-chip
+                  :color="userChipColor(t.side)"
+                  text-color="white"
+                  dense
+                  square
+                  class="text-weight-bold"
+                >
+                  {{ userActionLabel(t.side) }}
+                </q-chip>
+                <q-space></q-space>
+                <q-badge
+                  :color="statusColor(t.status)"
+                  :label="statusLabel(t.status)"
+                ></q-badge>
+              </div>
+              <div class="row items-center q-mt-xs">
+                <q-badge
+                  :color="t.role === 'maker' ? 'indigo-6' : 'deep-purple-5'"
+                >
+                  <q-icon
+                    :name="t.role === 'maker' ? 'campaign' : 'pan_tool'"
+                    size="12px"
+                    class="q-mr-xs"
+                  ></q-icon>
+                  {{ roleLabel(t.role) }}
+                </q-badge>
+              </div>
+              <div class="row items-center no-wrap q-gutter-sm q-mt-xs">
+                <q-avatar
+                  size="24px"
+                  :key="tradeAvatarKey(t)"
+                  :class="{
+                    'trato-avatar-link': njumpProfileUrl(tradeCardFace(t).pubkey)
+                  }"
+                  @click.stop="avatarNjumpClick(tradeCardFace(t).pubkey)"
+                >
+                  <img
+                    :src="tradeAvatarSrc(t)"
+                    :alt="tradeCardFace(t).label"
+                    referrerpolicy="no-referrer"
+                    loading="lazy"
+                    decoding="async"
+                    @error="onAvatarError(tradeAvatarKey(t))"
+                  >
+                  <q-tooltip v-if="njumpProfileUrl(tradeCardFace(t).pubkey)">
+                    View Nostr profile on njump
+                  </q-tooltip>
+                </q-avatar>
+                <span class="text-caption text-grey-7 ellipsis">
+                  {{ tradeCardFace(t).label }}
+                </span>
+              </div>
+              <div class="text-caption text-grey q-mt-xs">
+                {{ moneyDirection(t.side) }}
+              </div>
+            </q-card-section>
+            <q-card-section class="q-py-xs">
+              <div class="text-subtitle1 text-weight-bold">
+                {{ t.fiat_amount ? t.fiat_amount + ' ' + t.fiat_code : t.fiat_code || '—' }}
+              </div>
+              <div class="text-caption text-grey">
+                <span>{{ t.amount_sats ? formatSats(t.amount_sats) + ' sats' : 'market' }}</span>
+                <span v-if="t.demo"> · demo</span>
+              </div>
+            </q-card-section>
+            <q-card-actions align="right">
+              <q-btn
+                v-if="t.role === 'maker' && t.status === 'pending'"
+                flat
+                dense
+                no-caps
+                color="grey-7"
+                icon="close"
+                :label="$t('trato.buttons.cancel')"
+                @click.stop="cancelOrder(t)"
+              ></q-btn>
+              <q-btn
+                v-if="isDeletableOrder(t)"
+                flat
+                dense
+                no-caps
+                color="negative"
+                icon="delete"
+                :label="$t('trato.buttons.delete')"
+                @click.stop="deleteOrder(t)"
+              ></q-btn>
+              <q-btn
+                flat
+                dense
+                no-caps
+                color="primary"
+                :label="$t('trato.buttons.open')"
+                @click.stop="openTrade(t)"
+              ></q-btn>
+            </q-card-actions>
+          </q-card>
+      </div>
+    </q-tab-panel>
+
+    <!-- ============ IDENTITY (trader profile) ============ -->
+    <q-tab-panel name="identity" class="q-pa-none">
+      <div class="row justify-center">
+        <div class="col-12 col-md-10 col-lg-8 col-xl-7 q-gutter-md">
+
+          <div
+            v-if="!identity && loading.identity"
+            class="text-center q-pa-xl"
+          >
+            <q-spinner color="primary" size="36px"></q-spinner>
+            <div class="text-caption text-grey q-mt-sm">Setting up your trader profile…</div>
+          </div>
+
+          <q-card v-else-if="identity" flat bordered>
+            <q-card-section class="row items-center q-gutter-md q-pb-sm">
+              <q-avatar size="56px">
+                <img
+                  :src="profileAvatarSrc(identity.identity_pubkey, null)"
+                  :alt="profileLabel(identity.identity_pubkey, 'You')"
+                  referrerpolicy="no-referrer"
+                >
+              </q-avatar>
+              <div class="col">
+                <div class="text-h6">
+                  {{ profileLabel(identity.identity_pubkey, 'Your profile') || 'Your profile' }}
+                </div>
+                <div class="text-caption text-grey">
+                  {{ $t('trato.identity.subtitle') }}
+                </div>
+                <div
+                  v-if="profileAbout(identity.identity_pubkey)"
+                  class="text-caption text-grey-7 q-mt-xs"
+                >
+                  {{ profileAbout(identity.identity_pubkey) }}
+                </div>
+                <div
+                  v-if="profileNip05(identity.identity_pubkey)"
+                  class="text-caption text-grey-6 q-mt-xs"
+                >
+                  {{ profileNip05(identity.identity_pubkey) }}
+                </div>
+                <div
+                  v-if="profileSocial(identity.identity_pubkey)"
+                  class="text-caption text-grey-6 q-mt-xs"
+                >
+                  {{ profileSocial(identity.identity_pubkey).line }}
+                  <q-tooltip max-width="280px">
+                    {{ profileSocial(identity.identity_pubkey).tooltip }}
+                  </q-tooltip>
+                </div>
+                <div
+                  v-if="!identityNostrProfileFound(identity.identity_pubkey)"
+                  class="text-caption text-grey-6 q-mt-xs"
+                >
+                  {{ $t('trato.identity.no_public_profile') }}
+                </div>
+              </div>
+              <div class="col-auto">
+                <q-btn
+                  flat
+                  dense
+                  color="primary"
+                  icon="edit"
+                  :label="$t('trato.identity.edit_profile')"
+                  @click="openNostrProfileEditor"
+                ></q-btn>
+              </div>
+            </q-card-section>
+            <q-separator></q-separator>
+            <q-card-section class="q-pb-sm">
+              <div class="text-subtitle2 text-weight-bold">npub</div>
+            </q-card-section>
+            <q-card-section class="q-pt-none">
+              <q-input
+                :model-value="identity.identity_npub"
+                label="npub"
+                readonly
+                outlined
+                dense
+              >
+                <template v-slot:append>
+                  <q-btn
+                    flat
+                    round
+                    dense
+                    icon="content_copy"
+                    @click="copyText(identity.identity_npub)"
+                  >
+                    <q-tooltip>Copy</q-tooltip>
+                  </q-btn>
+                </template>
+              </q-input>
+            </q-card-section>
+
+            <q-separator></q-separator>
+            <q-card-section class="q-py-sm">
+              <div class="row items-center">
+                <div class="text-subtitle2 text-weight-bold col">Reputation</div>
+                <q-btn
+                  flat
+                  dense
+                  round
+                  icon="refresh"
+                  size="sm"
+                  :loading="identityReputationLoading"
+                  @click="loadIdentityReputation"
+                ></q-btn>
+              </div>
+              <div
+                v-if="identityReputationLoading && !identityReputation"
+                class="text-caption text-grey q-mt-xs"
+              >
+                Loading…
+              </div>
+              <div
+                v-else-if="identityReputation && identityReputation.found && identityReputation.total_reviews > 0"
+                class="row items-center q-gutter-xs q-mt-xs"
+              >
+                <q-rating
+                  :model-value="identityReputation.stars"
+                  :max="5"
+                  size="1em"
+                  color="amber"
+                  readonly
+                ></q-rating>
+                <span class="text-caption">
+                  {{ identityReputation.stars.toFixed(1) }}
+                  · {{ identityReputation.total_reviews }} review{{ identityReputation.total_reviews === 1 ? '' : 's' }}
+                </span>
+              </div>
+              <div v-else class="text-caption text-grey q-mt-xs">—</div>
+            </q-card-section>
+          </q-card>
+
+          <q-card v-else flat bordered>
+            <q-card-section>
+              <q-select
+                v-model="newIdentity.wallet"
+                :options="walletOptions"
+                label="Wallet"
+                emit-value
+                map-options
+                outlined
+                dense
+              ></q-select>
+            </q-card-section>
+            <q-card-actions align="right">
+              <q-btn
+                unelevated
+                color="primary"
+                no-caps
+                label="Continue"
+                :loading="loading.identity"
+                :disable="!newIdentity.wallet"
+                @click="createIdentity(false)"
+              ></q-btn>
+            </q-card-actions>
+          </q-card>
+
+          <q-card v-if="identity" flat bordered>
+            <q-card-section class="row items-center">
+              <div class="text-h6 col">Cash meetup</div>
+              <q-btn
+                unelevated
+                color="teal"
+                no-caps
+                dense
+                icon="add_location"
+                label="Set spot"
+                @click="openMeetupEditor(-1)"
+              ></q-btn>
+            </q-card-section>
+            <q-card-section v-if="meetupProfiles.length" class="q-pt-none">
+              <q-list bordered separator dense class="rounded-borders">
+                <q-item
+                  v-for="(p, mi) in meetupProfiles"
+                  :key="p.id || 'meetup-' + mi"
+                >
+                  <q-item-section avatar>
+                    <q-icon name="place" color="teal"></q-icon>
+                  </q-item-section>
+                  <q-item-section>
+                    <q-item-label>{{ p.label || p.place_label || 'Meetup' }}</q-item-label>
+                    <q-item-label caption>{{ profileSummaryLine(p) }}</q-item-label>
+                  </q-item-section>
+                  <q-item-section side>
+                    <q-btn flat dense round icon="edit" @click="openMeetupEditor(mi)"></q-btn>
+                    <q-btn
+                      flat
+                      dense
+                      round
+                      icon="delete"
+                      color="negative"
+                      @click="removeProfile(paymentDetailsForm.profiles.findIndex(x => x.id === p.id))"
+                    ></q-btn>
+                  </q-item-section>
+                </q-item>
+              </q-list>
+            </q-card-section>
+            <q-card-section v-else class="q-pt-none text-caption text-grey">
+              No meetup spot yet — tap <strong>Set spot</strong> for cash-in-person trades.
+            </q-card-section>
+          </q-card>
+
+          <q-card v-if="identity" flat bordered>
+            <q-card-section class="row items-center">
+              <div class="col">
+                <div class="text-h6">Payment methods</div>
+                <div class="text-caption text-grey">
+                  SEPA, SEPA Instant, apps, M-Pesa, mobile money, and more
+                </div>
+              </div>
+              <q-btn
+                flat
+                no-caps
+                dense
+                color="primary"
+                icon="add"
+                label="Add"
+                @click="openBankProfileEditor(-1)"
+              ></q-btn>
+            </q-card-section>
+            <q-card-section v-if="bankProfiles.length" class="q-pt-none">
+              <q-list bordered separator dense class="rounded-borders">
+                <q-item v-for="(p, i) in bankProfiles" :key="p.id || i">
+                  <q-item-section>
+                    <q-item-label>{{ profileDisplayName(p) }}</q-item-label>
+                    <q-item-label caption>{{ profileSummaryLine(p) }}</q-item-label>
+                  </q-item-section>
+                  <q-item-section side>
+                    <q-btn
+                      flat
+                      dense
+                      round
+                      icon="edit"
+                      @click="openBankProfileEditor(paymentDetailsForm.profiles.findIndex(x => x.id === p.id))"
+                    ></q-btn>
+                    <q-btn
+                      flat
+                      dense
+                      round
+                      icon="delete"
+                      color="negative"
+                      @click="removeProfile(paymentDetailsForm.profiles.findIndex(x => x.id === p.id))"
+                    ></q-btn>
+                  </q-item-section>
+                </q-item>
+              </q-list>
+              <q-spinner v-if="paymentDetailsForm.loading" color="primary" class="q-mt-sm"></q-spinner>
+            </q-card-section>
+            <q-card-section v-else class="q-pt-none text-caption text-grey">
+              No payment methods yet — add SEPA, SEPA Instant, PayPal, M-Pesa, or others you accept.
+              Cash in person is under <strong>Set spot</strong> above or pick it from Add.
+            </q-card-section>
+          </q-card>
+
+          <q-card v-if="identity" flat bordered>
+            <q-card-section class="row items-center">
+              <div class="col">
+                <div class="text-h6">{{ t('identity.bitcoin_receive_title') }}</div>
+                <div class="text-caption text-grey">
+                  {{ t('identity.bitcoin_receive_sub') }}
+                </div>
+              </div>
+              <q-btn
+                flat
+                no-caps
+                dense
+                color="primary"
+                icon="add"
+                :label="t('identity.bitcoin_receive_add')"
+                @click="openBitcoinReceiveEditor(-1)"
+              ></q-btn>
+            </q-card-section>
+            <q-card-section v-if="bitcoinReceiveProfiles.length" class="q-pt-none">
+              <q-list bordered separator dense class="rounded-borders">
+                <q-item v-for="(p, i) in bitcoinReceiveProfiles" :key="p.id || i">
+                  <q-item-section>
+                    <q-item-label>{{ profileDisplayName(p) }}</q-item-label>
+                    <q-item-label caption>{{ profileSummaryLine(p) }}</q-item-label>
+                  </q-item-section>
+                  <q-item-section side>
+                    <q-btn
+                      flat
+                      dense
+                      round
+                      icon="edit"
+                      @click="openBitcoinReceiveEditor(bitcoinReceiveProfiles.findIndex(x => x.id === p.id))"
+                    ></q-btn>
+                    <q-btn
+                      flat
+                      dense
+                      round
+                      icon="delete"
+                      color="negative"
+                      @click="removeProfile(paymentDetailsForm.profiles.findIndex(x => x.id === p.id))"
+                    ></q-btn>
+                  </q-item-section>
+                </q-item>
+              </q-list>
+            </q-card-section>
+            <q-card-section v-else class="q-pt-none text-caption text-grey">
+              {{ t('identity.bitcoin_receive_empty') }}
+              <div v-if="lightningReceiveChoices.length" class="q-mt-sm">
+                <div class="q-mb-xs">{{ t('identity.bitcoin_receive_pick_source') }}</div>
+                <div class="row q-gutter-xs wrap">
+                  <q-btn
+                    v-for="choice in lightningReceiveChoices"
+                    :key="'empty-' + choice.lightning_address + '-' + choice.source"
+                    flat
+                    dense
+                    no-caps
+                    color="primary"
+                    icon="bolt"
+                    :label="choice.lightning_address + ' · ' + choice.source_label"
+                    @click="openBitcoinReceiveEditor(-1); applyLightningReceiveChoice(choice)"
+                  ></q-btn>
+                </div>
+              </div>
+              <div v-else-if="lnurlpReceiveHint" class="q-mt-sm">
+                <div v-if="lnurlpReceiveHint.note" class="q-mb-xs">{{ lnurlpReceiveHint.note }}</div>
+                <q-btn
+                  v-if="lnurlpReceiveHint.extension_installed"
+                  flat
+                  dense
+                  no-caps
+                  color="primary"
+                  icon="open_in_new"
+                  label="Open LNURLp"
+                  :href="lnurlpReceiveHint.extension_url"
+                  target="_blank"
+                  class="q-mr-xs"
+                ></q-btn>
+                <template v-else>
+                  {{ t('identity.bitcoin_receive_lnurlp_install') }}
+                  <a :href="lnurlpReceiveHint.extensions_url" target="_blank" rel="noopener">LNURLp</a>.
+                </template>
+              </div>
+            </q-card-section>
+          </q-card>
+
+        </div>
+      </div>
+    </q-tab-panel>
+
+    <!-- ============ SETTINGS ============ -->
+    <q-tab-panel name="settings" class="q-pa-none">
+      <div class="row justify-center">
+        <div class="col-12 col-md-10 col-lg-8 col-xl-7">
+          <q-banner
+            :class="health.escrow && health.escrow.hold_invoices_supported
+              ? 'bg-green-1 text-green-9' : 'bg-grey-3 text-grey-8'"
+            class="rounded-borders q-mb-md"
+          >
+            <template v-slot:avatar>
+              <q-icon
+                :name="health.escrow && health.escrow.hold_invoices_supported
+                  ? 'verified' : 'info'"
+              ></q-icon>
+            </template>
+            <span v-if="health.escrow">{{ health.escrow.message }}</span>
+            <span v-else>Checking escrow capability…</span>
+          </q-banner>
+
+          <q-banner
+            v-if="liveTradingBlockers.length"
+            class="bg-orange-1 text-orange-10 rounded-borders q-mb-md"
+            dense
+          >
+            <template v-slot:avatar>
+              <q-icon name="info" color="orange-9"></q-icon>
+            </template>
+            <strong>Complete setup for live trading.</strong>
+            <ul class="q-my-xs q-pl-md">
+              <li v-for="(b, i) in liveTradingBlockers" :key="i">{{ b }}</li>
+            </ul>
+            Turn on <strong>Demo mode</strong> above to practise until live trading is enabled.
+          </q-banner>
+
+          <q-card flat bordered>
+            <q-card-section>
+              <div class="text-h6">Settings</div>
+            </q-card-section>
+            <q-separator></q-separator>
+            <q-card-section class="q-gutter-md">
+              <q-input
+                v-model="settingsForm.relaysText"
+                type="textarea"
+                autogrow
+                outlined
+                dense
+                label="Relays (one per line)"
+              ></q-input>
+              <q-input
+                v-model="settingsForm.mostro_pubkey"
+                outlined
+                dense
+                label="Default Mostro operator pubkey (hex, optional)"
+              ></q-input>
+              <q-toggle
+                v-model="settingsForm.demo_mode"
+                label="Demo mode (practice trades — no real sats)"
+                color="orange"
+              ></q-toggle>
+              <div class="text-caption text-grey q-ml-lg q-mt-xs q-mb-sm">
+                Off = live/production. Each trade remembers which mode it was
+                created in; My trades only shows trades matching your current
+                setting.
+              </div>
+              <q-toggle
+                v-model="settingsForm.mainnet_enabled"
+                label="Enable mainnet (required for real-money trading)"
+                color="red"
+              ></q-toggle>
+              <q-separator class="q-my-sm"></q-separator>
+              <div class="text-subtitle2 text-weight-bold">RoboSats (live bonds)</div>
+              <div class="text-caption text-grey q-mb-sm">
+                Optional NWC wallet connection for paying RoboSats taker bonds in live
+                mode, and for receiving sats via Lightning invoice when you buy Bitcoin.
+                Encrypted at rest — never shown again after save. Demo mode does not
+                need NWC.
+              </div>
+              <q-input
+                v-model="settingsForm.nwc_uri"
+                outlined
+                dense
+                type="password"
+                autocomplete="off"
+                :label="settings.has_nwc ? 'NWC URI (leave blank to keep current)' : 'NWC URI (nwc://…)'"
+                hint="Phoenix, Alby, or any NIP-47 wallet"
+              ></q-input>
+              <q-checkbox
+                v-if="settings.has_nwc"
+                v-model="settingsForm.clear_nwc"
+                label="Disconnect NWC wallet"
+                color="negative"
+                dense
+              ></q-checkbox>
+              <q-select
+                v-model="settingsForm.robosats_coordinator"
+                outlined
+                dense
+                clearable
+                emit-value
+                map-options
+                :options="robosatsCoordinatorOptions"
+                label="Default RoboSats coordinator (optional)"
+                hint="Federation alias — used when the book row has no coordinator tag"
+              ></q-select>
+              <q-separator class="q-my-sm"></q-separator>
+              <div class="text-subtitle2 text-weight-bold">Trading in Trato</div>
+              <div class="text-caption text-grey q-mt-xs">{{ tradingInTratoBlurb }}</div>
+            </q-card-section>
+            <q-card-actions align="right">
+              <q-btn
+                unelevated
+                color="primary"
+                no-caps
+                label="Save settings"
+                :loading="loading.settings"
+                @click="saveSettings"
+              ></q-btn>
+            </q-card-actions>
+          </q-card>
+        </div>
+      </div>
+    </q-tab-panel>
+  </q-tab-panels>
+
+  <!-- ====== Create order dialog ====== -->
+  <q-dialog v-model="createDialog.show">
+    <q-card class="trato-dialog">
+      <q-card-section>
+        <div class="text-h6">Create order</div>
+      </q-card-section>
+      <q-separator></q-separator>
+      <q-card-section class="q-gutter-sm">
+        <q-select
+          v-model="createDialog.data.side"
+          :options="sideOptions"
+          label="I want to"
+          emit-value
+          map-options
+          outlined
+          dense
+        ></q-select>
+        <div class="text-caption text-grey">
+          You post this offer as the maker. Others take the opposite side.
+        </div>
+        <div class="row q-col-gutter-sm">
+          <div class="col-6">
+            <q-select
+              v-model="createDialog.data.fiat_code"
+              :options="currencyOptions"
+              label="Currency"
+              outlined
+              dense
+              use-input
+              fill-input
+              hide-selected
+              input-debounce="0"
+              new-value-mode="add-unique"
+              @filter="filterCurrencies"
+              @update:model-value="fetchRate"
+            ></q-select>
+          </div>
+          <div class="col-6">
+            <q-input
+              v-model.number="createDialog.data.fiat_amount"
+              type="number"
+              label="Fiat amount"
+              outlined
+              dense
+              @update:model-value="recalcFromFiat"
+            ></q-input>
+          </div>
+        </div>
+
+        <q-select
+          v-model="createDialog.data.payment_methods"
+          :options="paymentMethodChoices"
+          label="Payment method(s)"
+          hint="Pick one or more, or type your own"
+          outlined
+          dense
+          multiple
+          use-chips
+          use-input
+          input-debounce="0"
+          new-value-mode="add-unique"
+          @filter="filterPaymentMethods"
+        ></q-select>
+
+        <q-toggle
+          v-model="createDialog.data.is_market"
+          label="Market price (operator prices at execution)"
+          color="primary"
+          @update:model-value="recalcFromFiat"
+        ></q-toggle>
+
+        <q-select
+          v-model="createDialog.data.settlement_layers"
+          :options="[
+            { label: 'Lightning', value: 'lightning' },
+            { label: 'On-chain', value: 'onchain' }
+          ]"
+          label="Settlement"
+          hint="On-chain settlement uses your Bitcoin address from Identity; needs mainnet + LND like Lightning."
+          outlined
+          dense
+          multiple
+          use-chips
+          emit-value
+          map-options
+        ></q-select>
+
+        <div class="row q-col-gutter-sm">
+          <div class="col-6" v-if="!createDialog.data.is_market">
+            <q-input
+              v-model.number="createDialog.data.amount_sats"
+              type="number"
+              label="Sats"
+              outlined
+              dense
+              @update:model-value="recalcFromSats"
+            ></q-input>
+          </div>
+          <div :class="createDialog.data.is_market ? 'col-12' : 'col-6'">
+            <q-input
+              v-model.number="createDialog.data.premium"
+              type="number"
+              label="Premium %"
+              hint="vs market rate"
+              outlined
+              dense
+              @update:model-value="recalcFromFiat"
+            ></q-input>
+          </div>
+        </div>
+
+        <div class="text-caption q-mt-xs" :class="createDialog.rate ? 'text-grey' : 'text-orange'">
+          <span v-if="createDialog.rateLoading">Fetching live price…</span>
+          <span v-else-if="!createDialog.rate">Live price unavailable for this currency — enter sats manually.</span>
+          <span v-else>
+            ≈ {{ formatSats(estimatedSats()) }} sats
+            <span class="text-grey-6">
+              · {{ formatSats(createDialog.rate) }} sats/{{ (createDialog.data.fiat_code || '').toUpperCase() }}
+              · BTC {{ Math.round(createDialog.btcPrice).toLocaleString() }} {{ (createDialog.data.fiat_code || '').toUpperCase() }}
+            </span>
+          </span>
+        </div>
+      </q-card-section>
+      <q-card-actions align="right">
+        <q-btn flat label="Cancel" no-caps v-close-popup></q-btn>
+        <q-btn
+          unelevated
+          color="primary"
+          no-caps
+          label="Create"
+          :loading="loading.create"
+          @click="submitCreate"
+        ></q-btn>
+      </q-card-actions>
+    </q-card>
+  </q-dialog>
+
+  <!-- ====== Order detail dialog ====== -->
+  <q-dialog v-model="detailDialog.show">
+    <q-card class="trato-dialog" v-if="detailDialog.order">
+      <q-card-section>
+        <div class="text-h6">
+          {{ userActionLabel(userSideIfTake(detailDialog.order.kind)) }}
+        </div>
+        <div class="text-caption text-weight-medium text-grey-6">
+          {{ orderCardActionDetail(detailDialog.order) }}
+        </div>
+        <div class="text-caption text-grey">
+          {{ platformLabel(detailDialog.order.platform) }}
+          <span v-if="!platformTratoSupports(detailDialog.order)">
+            · browse only in Trato
+          </span>
+        </div>
+      </q-card-section>
+      <q-separator></q-separator>
+
+      <!-- Reputation -->
+      <q-card-section
+        v-if="repTrustPanelVisible(detailDialog.order)"
+        class="q-py-sm trato-trust-panel"
+      >
+        <div class="row items-start no-wrap q-gutter-sm">
+          <q-icon name="shield" size="20px" color="amber-8" class="q-mt-xs"></q-icon>
+          <div class="col">
+            <div
+              v-if="repAnyBadge(repInfo(detailDialog.order))"
+              class="row items-center q-gutter-xs trato-rep-badges q-mb-xs"
+            >
+              <q-badge
+                v-if="repReputationBadge(repInfo(detailDialog.order)).show"
+                :color="repReputationBadge(repInfo(detailDialog.order)).color"
+                text-color="white"
+                class="trato-rep-badge"
+              >
+                <q-icon
+                  v-if="repReputationBadge(repInfo(detailDialog.order)).icon"
+                  :name="repReputationBadge(repInfo(detailDialog.order)).icon"
+                  size="12px"
+                  class="q-mr-xs"
+                ></q-icon>
+                {{ repReputationBadge(repInfo(detailDialog.order)).label }}
+                <q-tooltip max-width="300px">
+                  {{ repReputationBadge(repInfo(detailDialog.order)).tooltip }}
+                </q-tooltip>
+              </q-badge>
+              <q-badge
+                v-if="repTradesBadge(repInfo(detailDialog.order)).show"
+                :color="repTradesBadge(repInfo(detailDialog.order)).color"
+                text-color="white"
+                class="trato-rep-badge"
+              >
+                {{ repTradesBadge(repInfo(detailDialog.order)).label }}
+                <q-tooltip max-width="300px">
+                  {{ repTradesBadge(repInfo(detailDialog.order)).tooltip }}
+                </q-tooltip>
+              </q-badge>
+              <q-badge
+                v-if="repTrustBadge(repInfo(detailDialog.order)).show"
+                :color="repTrustBadge(repInfo(detailDialog.order)).color"
+                text-color="white"
+                class="trato-rep-badge"
+              >
+                {{ repTrustBadge(repInfo(detailDialog.order)).label }}
+                <q-tooltip max-width="300px">
+                  {{ repTrustBadge(repInfo(detailDialog.order)).tooltip }}
+                </q-tooltip>
+              </q-badge>
+            </div>
+            <div
+              v-if="repInfo(detailDialog.order).tier !== 'unknown'"
+              class="text-caption text-grey-8 q-mb-xs"
+            >
+              {{ repInfo(detailDialog.order).tierDetail }}
+            </div>
+            <div
+              v-if="repInfo(detailDialog.order).name"
+              class="text-caption text-grey-6"
+            >
+              {{ repInfo(detailDialog.order).name }}
+            </div>
+          </div>
+          <q-chip
+            v-if="repInfo(detailDialog.order).bonded"
+            dense
+            color="green-2"
+            text-color="green-9"
+            icon="savings"
+          >
+            Bonded
+            <q-tooltip>
+              Refundable security deposit — anti no-show, not identity verification.
+            </q-tooltip>
+          </q-chip>
+        </div>
+      </q-card-section>
+      <q-separator></q-separator>
+
+      <q-card-section>
+        <div class="row q-col-gutter-sm">
+          <div class="col-6 text-grey">Price</div>
+          <div class="col-6 text-right">{{ detailDialog.order.fiat_display }}</div>
+          <div class="col-6 text-grey">Sats</div>
+          <div class="col-6 text-right">
+            {{ detailDialog.order.is_market_price ? 'market' :
+            formatSats(detailDialog.order.amount_sats) }}
+          </div>
+          <div class="col-6 text-grey">Premium</div>
+          <div class="col-6 text-right">
+            {{ premiumLabel(detailDialog.order.premium) || '0%' }}
+            <span class="text-grey-6">vs market</span>
+          </div>
+          <div class="col-6 text-grey">Settlement</div>
+          <div class="col-6 text-right">
+            <template v-if="orderLayers(detailDialog.order).length > 1">
+              <q-select
+                v-model="detailDialog.takeSettlement"
+                :options="takeSettlementOptions(detailDialog.order)"
+                dense
+                outlined
+                emit-value
+                map-options
+                hide-bottom-space
+                class="trato-detail-settlement"
+              ></q-select>
+              <div class="text-caption text-grey q-mt-xs">
+                This offer supports multiple settlement types — pick one before taking.
+              </div>
+            </template>
+            <template v-else>{{ layerLabel(detailDialog.order) }}</template>
+          </div>
+          <div class="col-6 text-grey">Network</div>
+          <div class="col-6 text-right">{{ detailDialog.order.network }}</div>
+          <div class="col-12 text-grey q-mt-sm">Payment method</div>
+          <div
+            v-if="takePaymentMethodOptions(detailDialog.order).length > 1"
+            class="col-12"
+          >
+            <q-select
+              v-model="detailDialog.takePaymentMethod"
+              :options="takePaymentMethodOptions(detailDialog.order)"
+              dense
+              outlined
+              emit-value
+              map-options
+              hide-bottom-space
+              class="trato-detail-payment"
+            ></q-select>
+            <div class="text-caption text-grey q-mt-xs">
+              {{ t('detail.pick_payment_method') }}
+            </div>
+          </div>
+          <div v-else class="col-12 trato-pm-row">
+            <q-chip
+              v-for="(pm, i) in expandPaymentMethods(detailDialog.order.payment_methods)"
+              :key="i"
+              square
+              class="trato-pm-chip"
+            >
+              <span class="trato-pm-chip__text trato-pm-chip__text--detail">{{ pm }}</span>
+            </q-chip>
+          </div>
+        </div>
+      </q-card-section>
+
+      <q-separator v-if="platformTratoSupports(detailDialog.order)"></q-separator>
+      <q-card-section
+        v-if="platformTratoSupports(detailDialog.order)"
+        class="q-py-sm trato-panel"
+      >
+        <div class="text-subtitle2 text-weight-bold q-mb-sm">
+          Your trade size
+        </div>
+        <div v-if="detailDialog.order.is_range" class="q-mb-sm">
+          <q-input
+            v-model.number="detailDialog.takeFiatAmount"
+            type="number"
+            dense
+            outlined
+            :label="'Fiat amount (' + detailDialog.order.fiat_code + ')'"
+            :hint="'Offer range: ' + detailDialog.order.fiat_display + ' — same for Mostro and RoboSats'"
+            :min="detailDialog.order.fiat_min"
+            :max="detailDialog.order.fiat_max"
+            step="0.01"
+            :error="!!detailFiatRangeError(detailDialog.order)"
+            :error-message="detailFiatRangeError(detailDialog.order) || undefined"
+          ></q-input>
+        </div>
+        <div
+          v-else-if="detailChosenFiatAmount(detailDialog.order)"
+          class="text-body2 q-mb-xs"
+        >
+          Fiat:
+          <strong>
+            {{ detailChosenFiatAmount(detailDialog.order) }}
+            {{ detailDialog.order.fiat_code }}
+          </strong>
+        </div>
+        <div v-if="detailDialog.quoteLoading" class="text-caption text-grey q-mb-xs">
+          Loading BTC price for estimate…
+        </div>
+        <div
+          v-else-if="detailSatsEstimate(detailDialog.order)"
+          class="text-body2 q-mb-xs"
+        >
+          Bitcoin:
+          <strong>≈ {{ formatSats(detailSatsEstimate(detailDialog.order)) }} sats</strong>
+          <span
+            v-if="detailDialog.order.is_market_price || detailDialog.order.is_range"
+            class="text-caption text-grey"
+          >
+            at current market
+            <template v-if="premiumLabel(detailDialog.order.premium)">
+              ({{ premiumLabel(detailDialog.order.premium) }} premium)
+            </template>
+          </span>
+        </div>
+        <div
+          v-else-if="detailDialog.order.is_market_price"
+          class="text-caption text-grey q-mb-xs"
+        >
+          Sats are fixed at take time from live BTC price
+          <template v-if="premiumLabel(detailDialog.order.premium)">
+            ({{ premiumLabel(detailDialog.order.premium) }} premium)
+          </template>.
+        </div>
+        <q-banner
+          dense
+          rounded
+          class="q-mt-sm"
+          :class="detailFundingNote().color + ' text-' + detailFundingNote().textColor"
+        >
+          {{ detailFundingNote().text }}
+        </q-banner>
+        <div
+          v-if="platformTratoSupports(detailDialog.order)"
+          class="trato-fee-breakdown q-mt-md"
+        >
+          <div class="text-caption text-grey q-mb-sm">
+            Quote for invoices — firm amounts at take / release. Not shown on book cards.
+          </div>
+          <div class="trato-fee-details">
+            <div
+              v-for="(row, fi) in detailFeeBreakdown.detailItems"
+              :key="fi"
+              class="trato-fee-row"
+            >
+              <div class="trato-fee-row__main row items-start">
+                <div class="col-7 text-caption">{{ row.label }}</div>
+                <div class="col-5 text-right text-caption text-weight-medium">{{ row.value }}</div>
+              </div>
+              <div v-if="row.detail" class="text-caption text-grey-7 q-mt-xs q-mb-xs">
+                {{ row.detail }}
+              </div>
+            </div>
+          </div>
+          <div
+            v-if="detailFeeBreakdown.summary.show"
+            class="trato-fee-summary q-mt-md"
+            :class="'trato-fee-summary--' + detailFeeBreakdown.summary.side"
+          >
+            <div class="trato-fee-summary__title">What you exchange (incl. fees)</div>
+            <div v-if="detailFeeBreakdown.summary.fiat" class="trato-fee-summary__row">
+              <div class="trato-fee-summary__label">{{ detailFeeBreakdown.summary.fiat.label }}</div>
+              <div class="trato-fee-summary__value">{{ detailFeeBreakdown.summary.fiat.value }}</div>
+            </div>
+            <div
+              v-if="detailFeeBreakdown.summary.premium"
+              class="trato-fee-summary__row trato-fee-summary__row--premium"
+            >
+              <div class="trato-fee-summary__label">{{ detailFeeBreakdown.summary.premium.label }}</div>
+              <div class="trato-fee-summary__value">{{ detailFeeBreakdown.summary.premium.value }}</div>
+              <div class="trato-fee-summary__detail">{{ detailFeeBreakdown.summary.premium.detail }}</div>
+            </div>
+            <div class="trato-fee-summary__row trato-fee-summary__row--fee">
+              <div class="trato-fee-summary__label">{{ detailFeeBreakdown.summary.feeShare.label }}</div>
+              <div class="trato-fee-summary__value">{{ detailFeeBreakdown.summary.feeShare.value }}</div>
+              <div class="trato-fee-summary__detail">{{ detailFeeBreakdown.summary.feeShare.detail }}</div>
+            </div>
+            <div
+              v-if="detailFeeBreakdown.summary.totalBtc"
+              class="trato-fee-summary__row trato-fee-summary__row--total"
+            >
+              <div class="trato-fee-summary__label">{{ detailFeeBreakdown.summary.totalBtc.label }}</div>
+              <div class="trato-fee-summary__value trato-fee-summary__value--total">
+                {{ detailFeeBreakdown.summary.totalBtc.value }}
+              </div>
+              <div class="trato-fee-summary__detail">{{ detailFeeBreakdown.summary.totalBtc.detail }}</div>
+            </div>
+          </div>
+        </div>
+      </q-card-section>
+
+      <q-card-actions align="right">
+        <q-btn flat label="Close" no-caps v-close-popup></q-btn>
+        <q-btn
+          v-if="platformTratoSupports(detailDialog.order)"
+          unelevated
+          :color="canTakeOrder(detailDialog.order) ? 'primary' : 'orange-8'"
+          no-caps
+          :label="takeButtonLabel(detailDialog.order)"
+          @click="explainTakeOrder(detailDialog.order)"
+        ></q-btn>
+        <q-btn
+          v-else
+          flat
+          no-caps
+          color="primary"
+          :label="'Open ' + platformLabel(detailDialog.order.platform)"
+          @click="explainTakeOrder(detailDialog.order)"
+        ></q-btn>
+      </q-card-actions>
+    </q-card>
+  </q-dialog>
+
+  <!-- ====== Trade lifecycle dialog ====== -->
+  <q-dialog
+    v-if="tradeDialog.order"
+    v-model="tradeDialog.show"
+    persistent
+    @hide="onTradeDialogHide"
+  >
+    <q-card class="trato-dialog trato-dialog--trade" :key="tradeDialog.order.id">
+      <q-card-section class="trato-trade-header q-pb-sm">
+        <div class="row items-start no-wrap q-gutter-sm">
+          <div class="col min-width-0">
+            <div class="row items-center q-gutter-xs q-mb-xs">
+              <div class="text-h6 text-no-wrap">
+                {{ userActionLabel(tradeDialog.order.side) }}
+                <span class="text-caption text-grey">({{ roleLabel(tradeDialog.order.role) }})</span>
+              </div>
+              <q-chip
+                v-if="tradeDialog.order.demo"
+                dense
+                size="sm"
+                color="blue-2"
+                text-color="blue-10"
+                class="trato-trade-demo-chip"
+              >
+                Demo
+                <q-tooltip max-width="300px">
+                  Practice only — no real sats or fiat. Timeline is a script; live
+                  trades follow the same steps but wait for real payments.
+                </q-tooltip>
+              </q-chip>
+              <q-chip
+                v-else
+                dense
+                size="sm"
+                color="red-2"
+                text-color="red-10"
+                class="trato-trade-live-chip"
+              >
+                Live
+                <q-tooltip max-width="300px">
+                  Real trade — escrow, fiat, and disputes follow the Mostro operator
+                  on this offer. Messages sync from the network.
+                </q-tooltip>
+              </q-chip>
+            </div>
+            <div
+              class="text-caption text-weight-medium"
+              :class="tradeDialog.order.side === 'sell' ? 'text-red-5' : 'text-green-5'"
+            >
+              {{ moneyDirection(tradeDialog.order.side) }}
+              <span class="text-grey-7 text-weight-regular">
+                ·
+                <template v-if="tradeDialog.order.fiat_amount">
+                  {{ tradeDialog.order.fiat_amount }} {{ tradeDialog.order.fiat_code }}
+                </template>
+                <template v-else>{{ tradeDialog.order.fiat_code }}</template>
+                <template v-if="tradeChosenPaymentMethod(tradeDialog.order)">
+                  · via {{ tradeChosenPaymentMethod(tradeDialog.order) }}
+                </template>
+                ·
+                <template v-if="tradeDialog.order.amount_sats">
+                  {{ formatSats(tradeDialog.order.amount_sats) }} sats
+                </template>
+                <template v-else-if="tradeDialog.order.fiat_amount && marketPrice.sats_per_fiat">
+                  ≈ {{ formatSats(Math.round(tradeDialog.order.fiat_amount * marketPrice.sats_per_fiat)) }} sats est.
+                </template>
+                <template v-else>market price</template>
+              </span>
+            </div>
+          </div>
+          <q-badge
+            :color="statusColor(tradeDialog.order.status)"
+            :label="statusLabel(tradeDialog.order.status)"
+          ></q-badge>
+        </div>
+      </q-card-section>
+      <q-separator></q-separator>
+
+      <q-banner
+        v-if="tradeDialog.order.status === 'dispute'"
+        dense
+        rounded
+        class="trato-dispute-banner q-ma-md"
+        :class="tradeDialog.order.demo ? 'bg-orange-2 text-orange-10' : 'bg-red-2 text-red-10'"
+      >
+        <template v-slot:avatar>
+          <q-icon name="gavel" color="red-8"></q-icon>
+        </template>
+        <div class="text-weight-medium">{{ t('trade.dispute_banner_title') }}</div>
+        <div class="text-caption q-mt-xs">{{ tradeDisputeBannerDetail }}</div>
+      </q-banner>
+
+      <q-card-section v-if="identity" class="trato-trade-parties q-py-sm">
+        <div class="row q-col-gutter-sm">
+          <div class="col-12 col-sm-6 row items-center no-wrap q-gutter-xs min-width-0">
+            <q-avatar size="32px">
+              <img
+                :src="profileAvatarSrc(identity.identity_pubkey, null)"
+                alt="You"
+                referrerpolicy="no-referrer"
+              >
+            </q-avatar>
+            <div class="col min-width-0">
+              <div class="text-caption text-grey">You</div>
+              <div class="text-body2 text-weight-medium ellipsis">
+                {{ profileLabel(identity.identity_pubkey, 'Trader') || 'You' }}
+              </div>
+            </div>
+          </div>
+          <div class="col-12 col-sm-6 row items-center no-wrap q-gutter-xs min-width-0">
+            <q-avatar size="32px">
+              <img
+                :src="profileAvatarSrc(tradePartnerPubkey(), tradePartnerAvatarSeed())"
+                :alt="tradePartnerLabel()"
+                referrerpolicy="no-referrer"
+              >
+            </q-avatar>
+            <div class="col min-width-0">
+              <div class="text-caption text-grey ellipsis">
+                Counterparty
+                <span v-if="tradeCounterparty && tradeCounterparty.platform">
+                  · {{ tradeCounterparty.platform }}
+                </span>
+              </div>
+              <div class="text-body2 text-weight-medium ellipsis">{{ tradePartnerLabel() }}</div>
+              <div
+                v-if="tradeCounterparty && repAnyBadge(repFromSnapshot(tradeCounterparty))"
+                class="row items-center q-gutter-xs q-mt-xs trato-rep-badges"
+              >
+                <q-badge
+                  v-if="repReputationBadge(repFromSnapshot(tradeCounterparty)).show"
+                  :color="repReputationBadge(repFromSnapshot(tradeCounterparty)).color"
+                  text-color="white"
+                  class="trato-rep-badge"
+                >
+                  {{ repReputationBadge(repFromSnapshot(tradeCounterparty)).label }}
+                  <q-tooltip max-width="280px">
+                    {{ repReputationBadge(repFromSnapshot(tradeCounterparty)).tooltip }}
+                  </q-tooltip>
+                </q-badge>
+                <q-badge
+                  v-if="repTradesBadge(repFromSnapshot(tradeCounterparty)).show"
+                  :color="repTradesBadge(repFromSnapshot(tradeCounterparty)).color"
+                  text-color="white"
+                  class="trato-rep-badge"
+                >
+                  {{ repTradesBadge(repFromSnapshot(tradeCounterparty)).label }}
+                  <q-tooltip max-width="280px">
+                    {{ repTradesBadge(repFromSnapshot(tradeCounterparty)).tooltip }}
+                  </q-tooltip>
+                </q-badge>
+                <q-badge
+                  v-if="repTrustBadge(repFromSnapshot(tradeCounterparty)).show"
+                  :color="repTrustBadge(repFromSnapshot(tradeCounterparty)).color"
+                  text-color="white"
+                  class="trato-rep-badge"
+                >
+                  {{ repTrustBadge(repFromSnapshot(tradeCounterparty)).label }}
+                  <q-tooltip max-width="280px">
+                    {{ repTrustBadge(repFromSnapshot(tradeCounterparty)).tooltip }}
+                  </q-tooltip>
+                </q-badge>
+                <q-icon
+                  v-if="repFromSnapshot(tradeCounterparty).bonded"
+                  name="savings"
+                  color="green-6"
+                  size="14px"
+                >
+                  <q-tooltip max-width="260px">
+                    Bond posted at take time (anti no-show) — not identity verified.
+                  </q-tooltip>
+                </q-icon>
+              </div>
+            </div>
+          </div>
+        </div>
+      </q-card-section>
+      <q-separator v-if="identity"></q-separator>
+
+      <q-card-section
+        v-if="activeTradeFeeBreakdown.summary.show"
+        class="trato-fee-breakdown trato-fee-breakdown--compact q-py-sm"
+      >
+        <div
+          class="trato-fee-summary trato-fee-summary--compact"
+          :class="'trato-fee-summary--' + activeTradeFeeBreakdown.summary.side"
+        >
+          <div class="trato-fee-summary__title">Your exchange</div>
+          <div v-if="activeTradeFeeBreakdown.summary.fiat" class="trato-fee-summary__row">
+            <div class="trato-fee-summary__label">{{ activeTradeFeeBreakdown.summary.fiat.label }}</div>
+            <div class="trato-fee-summary__value">{{ activeTradeFeeBreakdown.summary.fiat.value }}</div>
+          </div>
+          <div
+            v-if="activeTradeFeeBreakdown.summary.premium"
+            class="trato-fee-summary__row trato-fee-summary__row--premium"
+          >
+            <div class="trato-fee-summary__label row items-center no-wrap">
+              {{ activeTradeFeeBreakdown.summary.premium.label }}
+              <q-icon name="info_outline" size="14px" class="q-ml-xs text-grey-6">
+                <q-tooltip max-width="280px">{{ activeTradeFeeBreakdown.summary.premium.detail }}</q-tooltip>
+              </q-icon>
+            </div>
+            <div class="trato-fee-summary__value">{{ activeTradeFeeBreakdown.summary.premium.value }}</div>
+          </div>
+          <div class="trato-fee-summary__row trato-fee-summary__row--fee">
+            <div class="trato-fee-summary__label row items-center no-wrap">
+              {{ activeTradeFeeBreakdown.summary.feeShare.label }}
+              <q-icon name="info_outline" size="14px" class="q-ml-xs text-grey-6">
+                <q-tooltip max-width="280px">{{ activeTradeFeeBreakdown.summary.feeShare.detail }}</q-tooltip>
+              </q-icon>
+            </div>
+            <div class="trato-fee-summary__value">{{ activeTradeFeeBreakdown.summary.feeShare.value }}</div>
+          </div>
+          <div
+            v-if="activeTradeFeeBreakdown.summary.totalBtc"
+            class="trato-fee-summary__row trato-fee-summary__row--total"
+          >
+            <div class="trato-fee-summary__label row items-center no-wrap">
+              {{ activeTradeFeeBreakdown.summary.totalBtc.label }}
+              <q-icon name="info_outline" size="14px" class="q-ml-xs text-grey-6">
+                <q-tooltip max-width="300px">{{ activeTradeFeeBreakdown.summary.totalBtc.detail }}</q-tooltip>
+              </q-icon>
+            </div>
+            <div class="trato-fee-summary__value trato-fee-summary__value--total">
+              {{ activeTradeFeeBreakdown.summary.totalBtc.value }}
+            </div>
+          </div>
+        </div>
+        <q-expansion-item
+          v-if="activeTradeFeeBreakdown.detailItems.length"
+          dense
+          expand-separator
+          icon="receipt_long"
+          label="Fee &amp; funding details"
+          :caption="activeTradeFeeBreakdown.headline"
+          header-class="text-caption trato-fee-expand__header"
+          class="trato-fee-expand"
+        >
+          <div class="trato-fee-details trato-fee-details--compact q-pb-sm">
+            <div
+              v-for="(row, fi) in activeTradeFeeBreakdown.detailItems"
+              :key="'tf-' + fi"
+              class="trato-fee-row trato-fee-row--compact"
+            >
+              <div class="trato-fee-row__main trato-fee-row__main--compact">
+                <span class="trato-fee-row__label">{{ row.label }}</span>
+                <span class="trato-fee-row__value">{{ row.value }}</span>
+                <q-icon
+                  v-if="row.detail"
+                  name="info_outline"
+                  size="14px"
+                  class="trato-fee-row__info text-grey-6"
+                >
+                  <q-tooltip max-width="300px">{{ row.detail }}</q-tooltip>
+                </q-icon>
+              </div>
+            </div>
+          </div>
+        </q-expansion-item>
+      </q-card-section>
+      <q-separator></q-separator>
+
+      <q-expansion-item
+        v-if="demoOnchainPanel"
+        dense
+        expand-separator
+        icon="link"
+        class="trato-panel trato-panel--accent-blue trato-demo-expand"
+        :label="demoOnchainPanel.title"
+        :caption="formatSats(demoOnchainPanel.sats) + ' sats · practice only'"
+      >
+        <q-card-section class="q-pt-none q-pb-sm">
+          <div class="text-caption text-grey-8 q-mb-sm">{{ demoOnchainPanel.hint }}</div>
+          <q-input
+            :model-value="demoOnchainPanel.address"
+            readonly
+            dense
+            outlined
+            type="textarea"
+            autogrow
+            label="Practice deposit address"
+          >
+            <template v-slot:append>
+              <q-btn
+                flat
+                dense
+                round
+                icon="content_copy"
+                @click="copyText(demoOnchainPanel.address)"
+              >
+                <q-tooltip>Copy address</q-tooltip>
+              </q-btn>
+            </template>
+          </q-input>
+        </q-card-section>
+      </q-expansion-item>
+
+      <q-expansion-item
+        v-if="demoLightningPanel"
+        dense
+        expand-separator
+        icon="bolt"
+        class="trato-panel trato-panel--accent-amber trato-demo-expand"
+        :label="demoLightningPanel.title"
+        :caption="formatSats(demoLightningPanel.sats) + ' sats · not payable'"
+      >
+        <q-card-section class="q-pt-none q-pb-sm">
+          <div class="text-caption text-grey-8 q-mb-sm">{{ demoLightningPanel.hint }}</div>
+          <q-input
+            :model-value="demoLightningPanel.bolt11"
+            readonly
+            outlined
+            dense
+            type="textarea"
+            autogrow
+            label="Practice invoice (not payable)"
+          >
+            <template v-slot:append>
+              <q-btn
+                flat
+                round
+                dense
+                icon="content_copy"
+                @click="copyText(demoLightningPanel.bolt11)"
+              >
+                <q-tooltip>Copy practice string</q-tooltip>
+              </q-btn>
+            </template>
+          </q-input>
+        </q-card-section>
+      </q-expansion-item>
+
+      <!-- Buyer: pay seller -->
+      <q-card-section
+        v-if="tradeDialog.order.side === 'buy' && tradeDialog.sellerPayment"
+        class="trato-panel trato-panel--accent-green q-pb-sm"
+      >
+        <div class="text-subtitle2 text-weight-bold q-mb-xs">
+          {{ sellerPaymentPanelTitle() }}
+        </div>
+        <div class="text-caption text-grey-8 q-mb-sm">
+          {{ sellerPaymentSummary() }}
+        </div>
+        <div
+          v-if="tradeDialog.sellerPayment && tradeDialog.sellerPayment.meetup_at"
+          class="text-caption text-grey-8 q-mb-sm"
+        >
+          Meetup: {{ formatMeetupLocal(tradeDialog.sellerPayment.meetup_at) }}
+        </div>
+        <div class="row q-gutter-xs">
+          <q-btn
+            v-for="(a, i) in tradeDialog.payActions"
+            :key="i"
+            unelevated
+            no-caps
+            size="sm"
+            :color="a.kind === 'open' ? 'primary' : 'grey-7'"
+            :icon="a.kind === 'open' ? 'open_in_new' : 'content_copy'"
+            :label="a.label"
+            @click="runPayAction(a)"
+          ></q-btn>
+        </div>
+        <div class="text-caption text-grey-7 q-mt-xs">
+          {{ t('trade.payment_sent_hint') }}
+        </div>
+      </q-card-section>
+      <q-card-section
+        v-else-if="tradeDialog.order.side === 'buy' && tradeDialog.order.status === 'fiat-sent'"
+        class="trato-panel trato-panel--accent-purple q-py-sm"
+      >
+        <div class="text-subtitle2 text-weight-bold q-mb-xs">
+          Waiting for seller to release Bitcoin
+        </div>
+        <div class="text-caption text-grey-8">
+          {{ t('trade.waiting_release') }}
+        </div>
+      </q-card-section>
+      <q-card-section
+        v-else-if="tradeDialog.order.side === 'buy'"
+        class="trato-panel q-py-sm"
+      >
+        <div class="text-caption text-grey-8">
+          {{ t('trade.waiting_seller_pay') }}
+        </div>
+      </q-card-section>
+
+      <!-- Seller: share payment -->
+      <q-card-section
+        v-if="tradeDialog.order.side === 'sell'"
+        class="q-pb-sm"
+      >
+        <div class="text-caption text-grey-8 q-mb-xs">
+          You receive the fiat — share a saved payment method with the buyer:
+        </div>
+        <div class="row q-col-gutter-sm items-center q-mt-sm">
+          <div class="col-grow">
+            <q-select
+              v-model="tradeDialog.shareProfileId"
+              :options="tradeDialog.paymentProfileOptions"
+              option-value="id"
+              option-label="label"
+              emit-value
+              map-options
+              outlined
+              dense
+              :disable="!tradeDialog.paymentProfileOptions.length"
+              placeholder="No saved methods — add in Identity tab"
+            ></q-select>
+          </div>
+          <div class="col-auto">
+            <q-btn
+              unelevated
+              color="primary"
+              no-caps
+              icon="share"
+              label="Share with buyer"
+              :loading="tradeDialog.sharingPayment"
+              :disable="!tradeDialog.shareProfileId"
+              @click="sharePaymentWithBuyer"
+            ></q-btn>
+          </div>
+        </div>
+        <q-input
+          v-if="shareProfileIsCashMeetup"
+          v-model="tradeDialog.meetupAtLocal"
+          type="datetime-local"
+          outlined
+          dense
+          class="q-mt-sm"
+          label="Proposed meetup time (your local timezone)"
+          hint="Shown to buyer in UTC + your timezone field from the meetup profile"
+        ></q-input>
+      </q-card-section>
+
+      <!-- Seller: buyer marked fiat sent — release Bitcoin -->
+      <q-card-section
+        v-if="tradeDialog.order.side === 'sell' && tradeDialog.order.status === 'fiat-sent'"
+        class="trato-panel trato-panel--accent-purple q-pb-sm"
+      >
+        <div class="text-subtitle2 text-weight-bold q-mb-xs">
+          {{ t('trade.seller_release_title') }}
+        </div>
+        <div
+          v-if="tradeDialog.buyerReceiveSummary"
+          class="text-body2 q-mb-sm"
+        >
+          Send to: <strong>{{ tradeDialog.buyerReceiveSummary }}</strong>
+        </div>
+        <div v-else class="text-caption text-grey-8 q-mb-sm">
+          Check the chat for the buyer's Lightning address or Bitcoin receive details.
+        </div>
+        <div class="text-caption text-grey-7">
+          When you have sent the sats, tap <strong>Release</strong> below.
+        </div>
+      </q-card-section>
+
+      <q-separator v-if="tradeDialog.order.side === 'buy' || tradeDialog.order.side === 'sell'"></q-separator>
+
+      <!-- Timeline -->
+      <q-card-section class="trato-timeline">
+        <div class="text-caption text-grey q-mb-sm">Activity</div>
+        <div v-if="displayTradeEvents.length === 0" class="text-grey text-caption">
+          No activity yet.
+        </div>
+        <template v-for="(e, i) in displayTradeEvents" :key="i">
+          <div v-if="e.direction === 'system'" class="trato-timeline-system">
+            <div class="trato-timeline-system__text">{{ eventText(e) }}</div>
+            <div class="trato-timeline-system__stamp">{{ eventStamp(e) }}</div>
+          </div>
+          <q-chat-message
+            v-else
+            :sent="eventIsSent(e)"
+            :name="eventSenderName(e)"
+            :text="[eventText(e)]"
+            :stamp="eventStamp(e)"
+            :bg-color="chatBg(e)"
+            text-color="white"
+          ></q-chat-message>
+        </template>
+      </q-card-section>
+
+      <q-separator></q-separator>
+
+      <!-- Chat input -->
+      <q-card-section class="q-pb-none">
+        <q-input
+          v-model="tradeDialog.chatText"
+          type="textarea"
+          autogrow
+          dense
+          outlined
+          placeholder="Message your trade partner…"
+          @keydown.ctrl.enter="sendChat"
+        >
+          <template v-slot:after>
+            <q-btn
+              flat
+              round
+              dense
+              icon="send"
+              :disable="!tradeDialog.chatText"
+              @click="sendChat"
+            ></q-btn>
+          </template>
+        </q-input>
+      </q-card-section>
+
+      <!-- Lifecycle actions -->
+      <q-card-actions align="left" class="trato-trade-actions q-gutter-xs q-px-md q-pb-md">
+        <q-btn
+          v-if="tradeDialog.allowed.includes('fiat-sent')"
+          unelevated
+          color="purple-7"
+          no-caps
+          icon="payments"
+          :label="t('buttons.payment_sent')"
+          :loading="tradeDialog.acting"
+          @click="doAction('fiat-sent')"
+        ></q-btn>
+        <q-btn
+          v-if="tradeDialog.allowed.includes('release')"
+          unelevated
+          color="green-7"
+          no-caps
+          icon="lock_open"
+          label="Release sats"
+          :loading="tradeDialog.acting"
+          @click="doAction('release')"
+        ></q-btn>
+        <q-btn
+          v-if="tradeDialog.allowed.includes('rate-user')"
+          unelevated
+          color="amber-8"
+          no-caps
+          icon="star"
+          label="Rate"
+          @click="openRateDialog"
+        ></q-btn>
+        <q-space></q-space>
+        <q-btn
+          v-if="tradeDialog.allowed.includes('dispute')"
+          flat
+          dense
+          color="red-7"
+          no-caps
+          icon="gavel"
+          label="Dispute"
+          :loading="tradeDialog.acting"
+          @click="doAction('dispute')"
+        ></q-btn>
+        <q-btn
+          v-if="tradeDialog.allowed.includes('cancel')"
+          flat
+          dense
+          color="grey-7"
+          no-caps
+          icon="close"
+          label="Cancel"
+          :loading="tradeDialog.acting"
+          @click="doAction('cancel')"
+        ></q-btn>
+      </q-card-actions>
+
+      <q-card-actions align="right">
+        <q-btn flat label="Close" no-caps v-close-popup></q-btn>
+      </q-card-actions>
+    </q-card>
+  </q-dialog>
+
+  <!-- Rating popup (sibling — nested q-dialog inside trade dialog breaks Quasar slot render) -->
+  <q-dialog v-model="tradeDialog.rateShow">
+    <q-card class="trato-dialog">
+      <q-card-section class="text-h6">Rate your counterpart</q-card-section>
+      <q-card-section class="text-center">
+        <q-rating
+          :model-value="tradeDialog.rating"
+          @update:model-value="v => { tradeDialog.rating = clampRating(v) }"
+          size="2.5em"
+          :max="5"
+          color="amber"
+        ></q-rating>
+        <div class="text-caption text-grey q-mt-sm">{{ tradeDialog.rating }} / 5</div>
+      </q-card-section>
+      <q-card-actions align="right">
+        <q-btn flat label="Cancel" no-caps v-close-popup></q-btn>
+        <q-btn
+          unelevated
+          color="primary"
+          no-caps
+          label="Submit"
+          @click="submitRating"
+        ></q-btn>
+      </q-card-actions>
+    </q-card>
+  </q-dialog>
+
+  <q-dialog v-model="nostrProfileForm.editor.show" persistent>
+    <q-card style="min-width: 320px; max-width: 480px">
+      <q-card-section>
+        <div class="text-h6">{{ $t('trato.identity.edit_profile') }}</div>
+        <div class="text-caption text-grey q-mt-xs">
+          {{ $t('trato.identity.edit_caption') }}
+        </div>
+      </q-card-section>
+      <q-card-section class="q-pt-none q-gutter-sm">
+        <q-input
+          v-model="nostrProfileForm.editor.draft.display_name"
+          :label="$t('trato.identity.display_name')"
+          outlined
+          dense
+          maxlength="64"
+          counter
+          :disable="nostrProfileForm.editor.saving"
+        ></q-input>
+        <q-input
+          v-model="nostrProfileForm.editor.draft.name"
+          :label="$t('trato.identity.username')"
+          outlined
+          dense
+          maxlength="64"
+          counter
+          :hint="$t('trato.identity.username_hint')"
+          :disable="nostrProfileForm.editor.saving"
+        ></q-input>
+        <q-input
+          v-model="nostrProfileForm.editor.draft.picture"
+          :label="$t('trato.identity.avatar_url')"
+          outlined
+          dense
+          maxlength="2048"
+          :hint="$t('trato.identity.avatar_hint')"
+          :disable="nostrProfileForm.editor.saving"
+        ></q-input>
+        <q-input
+          v-model="nostrProfileForm.editor.draft.about"
+          :label="$t('trato.identity.bio')"
+          outlined
+          dense
+          type="textarea"
+          autogrow
+          maxlength="1000"
+          counter
+          :disable="nostrProfileForm.editor.saving"
+        ></q-input>
+        <q-input
+          v-model="nostrProfileForm.editor.draft.nip05"
+          :label="$t('trato.identity.nip05')"
+          outlined
+          dense
+          maxlength="128"
+          :hint="$t('trato.identity.nip05_hint')"
+          :disable="nostrProfileForm.editor.saving"
+        ></q-input>
+        <q-input
+          v-model="nostrProfileForm.editor.draft.lud16"
+          :label="$t('trato.identity.lud16')"
+          outlined
+          dense
+          maxlength="200"
+          :hint="$t('trato.identity.lud16_hint')"
+          :disable="nostrProfileForm.editor.saving"
+        ></q-input>
+      </q-card-section>
+      <q-card-actions align="right">
+        <q-btn
+          flat
+          :label="$t('trato.buttons.cancel')"
+          :disable="nostrProfileForm.editor.saving"
+          v-close-popup
+        ></q-btn>
+        <q-btn
+          color="primary"
+          :label="$t('trato.buttons.save')"
+          :loading="nostrProfileForm.editor.saving"
+          @click="saveNostrProfile"
+        ></q-btn>
+      </q-card-actions>
+    </q-card>
+  </q-dialog>
+
+  <q-dialog v-model="paymentDetailsForm.editor.show">
+    <q-card style="min-width: 320px; max-width: 480px">
+      <q-card-section>
+        <div class="text-h6">
+          <template v-if="paymentDetailsForm.editor.meetupMode">
+            {{ paymentDetailsForm.editor.index >= 0 ? 'Edit' : 'Set' }} meetup spot
+          </template>
+          <template v-else-if="paymentDetailsForm.editor.bitcoinMode">
+            {{ paymentDetailsForm.editor.index >= 0 ? 'Edit' : 'Add' }} Bitcoin receive
+          </template>
+          <template v-else>
+            {{ paymentDetailsForm.editor.index >= 0 ? 'Edit' : 'Add' }} bank / app method
+          </template>
+        </div>
+      </q-card-section>
+      <q-separator></q-separator>
+      <q-card-section class="q-gutter-sm">
+        <template v-if="paymentDetailsForm.editor.meetupMode">
+          <p class="text-caption text-grey-7 q-mb-none">
+            Open the map, move to your meeting spot, copy the link from your browser, and paste it below.
+          </p>
+          <div class="row q-gutter-xs">
+            <q-btn
+              flat
+              dense
+              no-caps
+              color="primary"
+              icon="map"
+              label="Open map"
+              @click="openOsmPickerForMeetup"
+            ></q-btn>
+            <q-btn
+              flat
+              dense
+              no-caps
+              color="grey-7"
+              icon="schedule"
+              label="Use my timezone"
+              @click="guessMeetupTimezone"
+            ></q-btn>
+          </div>
+          <q-input
+            v-model="paymentDetailsForm.editor.draft.label"
+            label="Label (optional)"
+            outlined
+            dense
+            hint="e.g. Hauptbahnhof meetup"
+          ></q-input>
+          <q-input
+            v-model="paymentDetailsForm.editor.draft.place_label"
+            label="Where to meet"
+            outlined
+            dense
+            hint="e.g. Hauptbahnhof north exit, Starbucks on Main St"
+          ></q-input>
+          <q-select
+            v-model="paymentDetailsForm.editor.draft.country"
+            :options="countryOptionsForEditor()"
+            label="Country"
+            emit-value
+            map-options
+            outlined
+            dense
+            clearable
+          ></q-select>
+          <q-input
+            v-model="paymentDetailsForm.editor.draft.map_url"
+            label="OpenStreetMap link"
+            outlined
+            dense
+            hint="Paste the full URL from your browser after you pick the spot"
+          >
+            <template v-slot:append>
+              <q-btn
+                flat
+                dense
+                round
+                icon="content_copy"
+                :disable="!paymentDetailsForm.editor.draft.map_url"
+                @click="copyText(paymentDetailsForm.editor.draft.map_url)"
+              ></q-btn>
+            </template>
+          </q-input>
+          <q-input
+            v-model="paymentDetailsForm.editor.draft.timezone"
+            label="Timezone (e.g. Europe/Berlin)"
+            outlined
+            dense
+          ></q-input>
+          <q-input
+            v-model="paymentDetailsForm.editor.draft.notes"
+            label="Notes (optional)"
+            type="textarea"
+            autogrow
+            outlined
+            dense
+          ></q-input>
+        </template>
+        <template v-else>
+        <q-select
+          v-model="paymentDetailsForm.editor.draft.type"
+          :options="paymentDetailsForm.editor.bitcoinMode ? bitcoinProfileTypeOptions : bankProfileTypeOptions"
+          :label="paymentDetailsForm.editor.bitcoinMode ? 'Receive method' : 'Payment method'"
+          emit-value
+          map-options
+          outlined
+          dense
+          @update:model-value="onBankProfileTypeChange"
+        ></q-select>
+        <p
+          v-if="paymentTypeDescription(paymentDetailsForm.editor.draft.type)"
+          class="text-caption text-grey-7 q-mb-none"
+        >
+          {{ paymentTypeDescription(paymentDetailsForm.editor.draft.type) }}
+        </p>
+
+        <template v-if="isSepaFamilyType(paymentDetailsForm.editor.draft.type)">
+          <q-input
+            v-model="paymentDetailsForm.editor.draft.account_name"
+            label="Account holder name"
+            outlined
+            dense
+          ></q-input>
+          <q-input
+            v-model="paymentDetailsForm.editor.draft.iban"
+            label="IBAN"
+            outlined
+            dense
+            hint="As shown in your banking app"
+            @update:model-value="onProfileIbanChange()"
+          ></q-input>
+          <q-input
+            v-model="paymentDetailsForm.editor.draft.bic"
+            label="BIC / SWIFT"
+            outlined
+            dense
+            hint="Optional for many EU domestic transfers"
+          ></q-input>
+          <q-input
+            v-model="paymentDetailsForm.editor.draft.bank_name"
+            label="Bank name (optional)"
+            outlined
+            dense
+          ></q-input>
+          <q-select
+            v-model="paymentDetailsForm.editor.draft.country"
+            :options="countryOptionsForEditor()"
+            label="Bank country"
+            emit-value
+            map-options
+            use-input
+            input-debounce="0"
+            outlined
+            dense
+            clearable
+            hint="Auto-filled from IBAN (first 2 letters) — change if needed"
+          ></q-select>
+          <q-checkbox
+            v-if="paymentDetailsForm.editor.draft.type === 'sepa'"
+            v-model="paymentDetailsForm.editor.alsoSepaInstant"
+            label="Also use for SEPA Instant (same account)"
+            dense
+          ></q-checkbox>
+        </template>
+
+        <template v-else-if="paymentDetailsForm.editor.draft.type === 'paypal'">
+          <q-input
+            v-model="paymentDetailsForm.editor.draft.account_name"
+            label="Name on PayPal"
+            outlined
+            dense
+          ></q-input>
+          <q-input
+            v-model="paymentDetailsForm.editor.draft.email"
+            label="PayPal email"
+            type="email"
+            outlined
+            dense
+          ></q-input>
+          <q-input
+            v-model="paymentDetailsForm.editor.draft.payment_link"
+            label="PayPal.me or payment link (optional)"
+            outlined
+            dense
+          ></q-input>
+        </template>
+
+        <template v-else-if="paymentDetailsForm.editor.draft.type === 'revolut'">
+          <q-input
+            v-model="paymentDetailsForm.editor.draft.account_name"
+            label="Name on Revolut"
+            outlined
+            dense
+          ></q-input>
+          <q-input
+            v-model="paymentDetailsForm.editor.draft.username"
+            label="Revolut @username"
+            outlined
+            dense
+          ></q-input>
+          <q-input
+            v-model="paymentDetailsForm.editor.draft.phone"
+            label="Phone (optional)"
+            outlined
+            dense
+          ></q-input>
+        </template>
+
+        <template v-else-if="paymentDetailsForm.editor.draft.type === 'wise'">
+          <q-input
+            v-model="paymentDetailsForm.editor.draft.account_name"
+            label="Account name"
+            outlined
+            dense
+          ></q-input>
+          <q-input
+            v-model="paymentDetailsForm.editor.draft.email"
+            label="Wise email"
+            type="email"
+            outlined
+            dense
+          ></q-input>
+          <q-input
+            v-model="paymentDetailsForm.editor.draft.username"
+            label="Wise tag (optional)"
+            outlined
+            dense
+          ></q-input>
+        </template>
+
+        <template v-else-if="paymentDetailsForm.editor.draft.type === 'bizum'">
+          <q-input
+            v-model="paymentDetailsForm.editor.draft.account_name"
+            label="Name"
+            outlined
+            dense
+          ></q-input>
+          <q-input
+            v-model="paymentDetailsForm.editor.draft.phone"
+            label="Bizum phone number"
+            outlined
+            dense
+          ></q-input>
+        </template>
+
+        <template v-else-if="paymentDetailsForm.editor.draft.type === 'mpesa'">
+          <q-input
+            v-model="paymentDetailsForm.editor.draft.account_name"
+            label="Name on M-Pesa"
+            outlined
+            dense
+          ></q-input>
+          <q-input
+            v-model="paymentDetailsForm.editor.draft.phone"
+            label="M-Pesa phone number"
+            outlined
+            dense
+            hint="Send-to-phone — use Till or Paybill if that is how you receive"
+          ></q-input>
+          <q-input
+            v-model="paymentDetailsForm.editor.draft.till_number"
+            label="Till number (optional)"
+            outlined
+            dense
+          ></q-input>
+          <q-input
+            v-model="paymentDetailsForm.editor.draft.paybill"
+            label="Paybill number (optional)"
+            outlined
+            dense
+          ></q-input>
+          <q-select
+            v-model="paymentDetailsForm.editor.draft.country"
+            :options="countryOptionsForEditor()"
+            label="Country"
+            emit-value
+            map-options
+            outlined
+            dense
+            clearable
+          ></q-select>
+        </template>
+
+        <template v-else-if="paymentDetailsForm.editor.draft.type === 'mobile_money'">
+          <q-input
+            v-model="paymentDetailsForm.editor.draft.account_name"
+            label="Account name"
+            outlined
+            dense
+          ></q-input>
+          <q-input
+            v-model="paymentDetailsForm.editor.draft.phone"
+            label="Mobile wallet phone number"
+            outlined
+            dense
+          ></q-input>
+          <q-input
+            v-model="paymentDetailsForm.editor.draft.provider"
+            label="Provider (e.g. Airtel Money, MTN)"
+            outlined
+            dense
+          ></q-input>
+          <q-select
+            v-model="paymentDetailsForm.editor.draft.country"
+            :options="countryOptionsForEditor()"
+            label="Country"
+            emit-value
+            map-options
+            outlined
+            dense
+            clearable
+          ></q-select>
+        </template>
+
+        <template v-else-if="isUsernameAppType(paymentDetailsForm.editor.draft.type)">
+          <q-input
+            v-model="paymentDetailsForm.editor.draft.account_name"
+            label="Name on account"
+            outlined
+            dense
+          ></q-input>
+          <q-input
+            v-model="paymentDetailsForm.editor.draft.username"
+            :label="usernameFieldLabel(paymentDetailsForm.editor.draft.type)"
+            outlined
+            dense
+          ></q-input>
+        </template>
+
+        <template v-else-if="paymentDetailsForm.editor.draft.type === 'zelle'">
+          <q-input
+            v-model="paymentDetailsForm.editor.draft.account_name"
+            label="Name on Zelle"
+            outlined
+            dense
+          ></q-input>
+          <q-input
+            v-model="paymentDetailsForm.editor.draft.email"
+            label="Zelle email"
+            type="email"
+            outlined
+            dense
+          ></q-input>
+          <q-input
+            v-model="paymentDetailsForm.editor.draft.phone"
+            label="Zelle phone (optional)"
+            outlined
+            dense
+          ></q-input>
+        </template>
+
+        <template v-else-if="paymentDetailsForm.editor.draft.type === 'cash_by_mail'">
+          <q-input
+            v-model="paymentDetailsForm.editor.draft.account_name"
+            label="Recipient name"
+            outlined
+            dense
+          ></q-input>
+          <q-select
+            v-model="paymentDetailsForm.editor.draft.country"
+            :options="countryOptionsForEditor()"
+            label="Country"
+            emit-value
+            map-options
+            outlined
+            dense
+            clearable
+          ></q-select>
+          <q-input
+            v-model="paymentDetailsForm.editor.draft.notes"
+            label="Mailing instructions"
+            type="textarea"
+            autogrow
+            outlined
+            dense
+          ></q-input>
+        </template>
+
+        <template v-else-if="paymentDetailsForm.editor.draft.type === 'lightning_address'">
+          <q-banner
+            v-if="lnurlpReceiveHint || lightningReceiveChoices.length"
+            dense
+            class="bg-blue-1 text-blue-10 rounded-borders q-mb-sm"
+          >
+            <div v-if="lnurlpReceiveHint && lnurlpReceiveHint.note" class="text-body2">
+              {{ lnurlpReceiveHint.note }}
+            </div>
+            <div
+              v-else-if="lightningReceiveChoices.length"
+              class="text-body2"
+            >
+              {{ t('identity.bitcoin_receive_pick_source') }}
+            </div>
+            <div class="q-mt-sm row q-gutter-sm items-center wrap">
+              <q-btn
+                v-if="lnurlpReceiveHint && lnurlpReceiveHint.extension_installed"
+                flat
+                dense
+                no-caps
+                color="primary"
+                icon="open_in_new"
+                label="Open LNURLp"
+                :href="lnurlpReceiveHint.extension_url"
+                target="_blank"
+              ></q-btn>
+              <q-btn
+                v-else-if="lnurlpReceiveHint"
+                flat
+                dense
+                no-caps
+                color="primary"
+                icon="extension"
+                label="LNbits extensions"
+                :href="lnurlpReceiveHint.extensions_url"
+                target="_blank"
+              ></q-btn>
+              <q-btn
+                v-for="choice in lightningReceiveChoices"
+                :key="choice.lightning_address + '-' + choice.source"
+                flat
+                dense
+                no-caps
+                color="primary"
+                icon="bolt"
+                :label="choice.lightning_address + ' · ' + choice.source_label"
+                @click="applyLightningReceiveChoice(choice)"
+              ></q-btn>
+            </div>
+            <div
+              v-if="!lightningReceiveChoices.length && paymentDetailsForm.nostrLud16"
+              class="text-caption q-mt-xs"
+            >
+              {{ t('identity.bitcoin_receive_nostr_only_hint') }}
+            </div>
+          </q-banner>
+          <q-input
+            v-model="paymentDetailsForm.editor.draft.account_name"
+            label="Your name (optional)"
+            outlined
+            dense
+          ></q-input>
+          <q-input
+            v-model="paymentDetailsForm.editor.draft.lightning_address"
+            label="Lightning address"
+            outlined
+            dense
+            hint="you@domain.com or LNURL-pay — or create one in LNURLp on this instance"
+          ></q-input>
+          <q-input
+            v-model="paymentDetailsForm.editor.draft.notes"
+            label="Notes (optional)"
+            type="textarea"
+            autogrow
+            outlined
+            dense
+          ></q-input>
+        </template>
+
+        <template v-else-if="paymentDetailsForm.editor.draft.type === 'onchain_btc'">
+          <q-input
+            v-model="paymentDetailsForm.editor.draft.account_name"
+            label="Your name (optional)"
+            outlined
+            dense
+          ></q-input>
+          <q-input
+            v-model="paymentDetailsForm.editor.draft.btc_address"
+            label="Bitcoin address"
+            outlined
+            dense
+            hint="bc1…, 1…, or 3…"
+          ></q-input>
+          <q-input
+            v-model="paymentDetailsForm.editor.draft.notes"
+            label="Notes (optional)"
+            type="textarea"
+            autogrow
+            outlined
+            dense
+          ></q-input>
+        </template>
+
+        <template v-else-if="paymentDetailsForm.editor.draft.type === 'nwc_wallet'">
+          <q-banner dense class="bg-blue-1 text-blue-10 rounded-borders q-mb-sm">
+            Connect your NWC URI in <strong>Settings</strong>. This profile tells the
+            seller you receive via Lightning invoice from that wallet.
+          </q-banner>
+          <q-input
+            v-model="paymentDetailsForm.editor.draft.account_name"
+            label="Label (e.g. Phoenix, Alby)"
+            outlined
+            dense
+          ></q-input>
+          <q-input
+            v-model="paymentDetailsForm.editor.draft.notes"
+            label="Notes (optional)"
+            type="textarea"
+            autogrow
+            outlined
+            dense
+          ></q-input>
+        </template>
+
+        <template v-else>
+          <q-input
+            v-model="paymentDetailsForm.editor.draft.account_name"
+            label="Account / contact name"
+            outlined
+            dense
+          ></q-input>
+          <q-input
+            v-model="paymentDetailsForm.editor.draft.notes"
+            label="Payment details"
+            type="textarea"
+            autogrow
+            outlined
+            dense
+          ></q-input>
+        </template>
+
+        <q-input
+          v-model="paymentDetailsForm.editor.draft.label"
+          label="Nickname (optional)"
+          outlined
+          dense
+          hint="Only if you keep several accounts — not shown to buyers"
+        ></q-input>
+        </template>
+      </q-card-section>
+      <q-card-actions align="right">
+        <q-btn flat no-caps label="Cancel" v-close-popup></q-btn>
+        <q-btn
+          unelevated
+          color="primary"
+          no-caps
+          label="Save"
+          :loading="paymentDetailsForm.loading"
+          @click="saveProfileDraft"
+        ></q-btn>
+      </q-card-actions>
+    </q-card>
+  </q-dialog>
+</div>
+{% endraw %} {% endblock %}

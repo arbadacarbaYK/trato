@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Trato — {{ title }}</title>
+  <link rel="icon" type="image/png" href="{{ static_url_for('trato/static', 'image/favicon-32.png') }}">
+  <link rel="stylesheet" href="{{ static_url_for('trato/static', 'css/trato.css') }}">
+</head>
+<body class="trato-gate-body">
+  <main class="trato-gate">
+    <img
+      src="{{ static_url_for('trato/static', 'image/trato.png') }}"
+      alt=""
+      width="56"
+      height="56"
+      class="trato-gate__logo"
+    >
+    <h1 class="trato-gate__title">Trato</h1>
+    <p class="trato-gate__lead">{{ lead }}</p>
+    {% if detail %}
+    <p class="trato-gate__detail">{{ detail }}</p>
+    {% endif %}
+    <div class="trato-gate__actions">
+      {% if show_browse %}
+      <a class="trato-gate__btn trato-gate__btn--primary" href="/trato/book">
+        Browse live offers
+      </a>
+      {% endif %}
+      {% if show_login %}
+      <a class="trato-gate__btn trato-gate__btn--primary" href="/">
+        Log in to LNbits
+      </a>
+      {% endif %}
+      {% if show_extensions %}
+      <a class="trato-gate__btn trato-gate__btn--primary" href="/extensions">
+        Enable Trato
+      </a>
+      {% endif %}
+      <a class="trato-gate__btn" href="/">Back to LNbits</a>
+    </div>
+    {% if hint %}
+    <p class="trato-gate__hint">{{ hint }}</p>
+    {% endif %}
+  </main>
+</body>
+</html>
