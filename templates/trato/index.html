@@ -637,10 +637,10 @@
               <q-btn
                 v-if="platformTratoSupports(o)"
                 unelevated
-                :color="canTakeOrder(o) ? 'primary' : 'orange-8'"
+                color="primary"
                 no-caps
-                :label="takeButtonLabel(o)"
-                @click="explainTakeOrder(o)"
+                :label="$t('buttons.take')"
+                @click="openOrderFromBook(o)"
               ></q-btn>
               <q-btn
                 v-else
@@ -1728,8 +1728,9 @@
         <q-btn
           v-if="platformTratoSupports(detailDialog.order)"
           unelevated
-          :color="canTakeOrder(detailDialog.order) ? 'primary' : 'orange-8'"
+          color="primary"
           no-caps
+          :disable="!canTakeOrder(detailDialog.order)"
           :label="takeButtonLabel(detailDialog.order)"
           @click="explainTakeOrder(detailDialog.order)"
         ></q-btn>

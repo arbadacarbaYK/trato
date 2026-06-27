@@ -1196,6 +1196,14 @@ window.app = Vue.createApp({
       if (order.is_range && !this.isDetailOpenForOrder(order)) return false
       return this.orderTakeBlockers(order).length === 0
     },
+    openOrderFromBook(order) {
+      if (!order) return
+      if (!this.platformTratoSupports(order)) {
+        this.explainTakeOrder(order)
+        return
+      }
+      this.showOrder(order)
+    },
     explainTakeOrder(order) {
       if (!order) return
       if (!this.platformTratoSupports(order)) {
