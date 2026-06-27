@@ -9,7 +9,7 @@
 />
 <link
   rel="stylesheet"
-  href="{{ static_url_for('trato/static', 'css/trato.css') }}?v={{ trato_version }}"
+  href="{{ static_url_for('trato/static', 'css/trato.css') }}&trato_v={{ trato_version }}"
 />
 <style>
   /* Material Icons are ligatures: hide icon slots until the font is ready. */
@@ -57,21 +57,21 @@
   window.TRATO_MOBILE_MONEY_COUNTRIES = {{ mobile_money_countries_json | safe }};
   window.TRATO_ICON_URL = "{{ static_url_for('trato/static', 'image/trato.png') }}";
 </script>
-<script src="{{ static_url_for('trato/static', 'js/fiat_sats.js') }}?v={{ trato_version }}"></script>
-<script src="{{ static_url_for('trato/static', 'js/avatar.js') }}?v={{ trato_version }}"></script>
-<script src="{{ static_url_for('trato/static', 'js/orderbook_sort.js') }}?v={{ trato_version }}"></script>
-<script src="{{ static_url_for('trato/static', 'js/book_filter_counts.js') }}?v={{ trato_version }}"></script>
-<script src="{{ static_url_for('trato/static', 'i18n/en.js') }}?v={{ trato_version }}"></script>
-<script src="{{ static_url_for('trato/static', 'i18n/pi.js') }}?v={{ trato_version }}"></script>
-<script src="{{ static_url_for('trato/static', 'i18n/ru.js') }}?v={{ trato_version }}"></script>
-<script src="{{ static_url_for('trato/static', 'i18n/zh.js') }}?v={{ trato_version }}"></script>
-<script src="{{ static_url_for('trato/static', 'i18n/ja.js') }}?v={{ trato_version }}"></script>
-<script src="{{ static_url_for('trato/static', 'i18n/nl.js') }}?v={{ trato_version }}"></script>
-<script src="{{ static_url_for('trato/static', 'i18n/es.js') }}?v={{ trato_version }}"></script>
-<script src="{{ static_url_for('trato/static', 'i18n/pt.js') }}?v={{ trato_version }}"></script>
-<script src="{{ static_url_for('trato/static', 'i18n/fr.js') }}?v={{ trato_version }}"></script>
-<script src="{{ static_url_for('trato/static', 'i18n/merge.js') }}?v={{ trato_version }}"></script>
-<script src="{{ static_url_for('trato/static', 'js/index.js') }}?v={{ trato_version }}"></script>
+<script src="{{ static_url_for('trato/static', 'js/fiat_sats.js') }}&trato_v={{ trato_version }}"></script>
+<script src="{{ static_url_for('trato/static', 'js/avatar.js') }}&trato_v={{ trato_version }}"></script>
+<script src="{{ static_url_for('trato/static', 'js/orderbook_sort.js') }}&trato_v={{ trato_version }}"></script>
+<script src="{{ static_url_for('trato/static', 'js/book_filter_counts.js') }}&trato_v={{ trato_version }}"></script>
+<script src="{{ static_url_for('trato/static', 'i18n/en.js') }}&trato_v={{ trato_version }}"></script>
+<script src="{{ static_url_for('trato/static', 'i18n/pi.js') }}&trato_v={{ trato_version }}"></script>
+<script src="{{ static_url_for('trato/static', 'i18n/ru.js') }}&trato_v={{ trato_version }}"></script>
+<script src="{{ static_url_for('trato/static', 'i18n/zh.js') }}&trato_v={{ trato_version }}"></script>
+<script src="{{ static_url_for('trato/static', 'i18n/ja.js') }}&trato_v={{ trato_version }}"></script>
+<script src="{{ static_url_for('trato/static', 'i18n/nl.js') }}&trato_v={{ trato_version }}"></script>
+<script src="{{ static_url_for('trato/static', 'i18n/es.js') }}&trato_v={{ trato_version }}"></script>
+<script src="{{ static_url_for('trato/static', 'i18n/pt.js') }}&trato_v={{ trato_version }}"></script>
+<script src="{{ static_url_for('trato/static', 'i18n/fr.js') }}&trato_v={{ trato_version }}"></script>
+<script src="{{ static_url_for('trato/static', 'i18n/merge.js') }}&trato_v={{ trato_version }}"></script>
+<script src="{{ static_url_for('trato/static', 'js/index.js') }}&trato_v={{ trato_version }}"></script>
 {% endblock %} {% block page %} {% raw %}
 <div class="trato-page" v-cloak>
   <div class="trato-app-header">
