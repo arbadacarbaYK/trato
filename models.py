@@ -53,6 +53,21 @@ class TratoSettings(BaseModel):
         data["mainnet_enabled"] = bool(data.get("mainnet_enabled", False))
         return cls(**data)
 
+    def reconcile_trading_mode(
+        self,
+        *,
+        demo_set: Optional[bool] = None,
+        mainnet_set: Optional[bool] = None,
+    ) -> None:
+        """Demo mode and mainnet are mutually exclusive."""
+        if demo_set is True:
+            self.mainnet_enabled = False
+        elif mainnet_set is True:
+            self.demo_mode = False
+        elif self.demo_mode and self.mainnet_enabled:
+            # Persisted conflict — prefer live trading.
+            self.demo_mode = False
+
     def public_dict(self) -> dict:
         return {
             "user": self.user,

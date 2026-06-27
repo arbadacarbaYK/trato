@@ -298,6 +298,10 @@ async def api_update_settings(
         settings.demo_mode = data.demo_mode
     if data.mainnet_enabled is not None:
         settings.mainnet_enabled = data.mainnet_enabled
+    settings.reconcile_trading_mode(
+        demo_set=data.demo_mode,
+        mainnet_set=data.mainnet_enabled,
+    )
     if data.clear_nwc:
         settings.encrypted_nwc_uri = None
     elif data.nwc_uri is not None:

@@ -44,7 +44,7 @@ hold invoices (LND on LNbits today; NWC for Mostro seller pay is the planned Pi-
 path).
 
 **Run your own operator** (earn fees, mediate disputes): separate — needs
-[Trato Operator](https://github.com/arbadacarbaYK/trato_operator/blob/main/README.md) + LND/`mostrod`, not phoenixd alone.
+[Trato Operator](../trato_operator/README.md) + LND/`mostrod`, not phoenixd alone.
 
 ### How live trades fit together
 
@@ -64,7 +64,7 @@ a shared phoenixd float for every taker.
 | Order book | Live relay data (network operators) | Live relay data |
 | Your trades | Simulated locally (no real sats) | Real Mostro / RoboSats paths |
 | Lightning invoices | Practice strings only | Real BOLT11 |
-| Mainnet switch | Optional | Required for live |
+| Mainnet switch | Off (auto when Demo on) | Required for live |
 | phoenixd on Pi | Book + demo + RoboSats live (NWC) | Book + RoboSats live (NWC); live Mostro needs LND identity wallet *or* Demo |
 
 **Live Mostro:** escrow is on the **ad’s operator** (foreign or yours). **Live RoboSats:**
@@ -93,23 +93,23 @@ needs **NWC** in Settings. On-chain settlement remains demo-only.
 
 Live order book (real Nostr ads; **DEMO** = practice trades only):
 
-![Order book](docs/screenshots/order-book.png)
+![Order book](../docs/screenshots/order-book.png)
 
 Trade dialog — fees, timeline, chat:
 
-![Trade dialog](docs/screenshots/trade-dialog.png)
+![Trade dialog](../docs/screenshots/trade-dialog.png)
 
 My trades, Identity, Settings, public book:
 
-![My trades](docs/screenshots/my-trades.png)
+![My trades](../docs/screenshots/my-trades.png)
 
-![Identity](docs/screenshots/identity.png)
+![Identity](../docs/screenshots/identity.png)
 
-![Settings](docs/screenshots/settings.png)
+![Settings](../docs/screenshots/settings.png)
 
-![Public order book](docs/screenshots/public-book.png)
+![Public order book](../docs/screenshots/public-book.png)
 
-Full gallery: [screenshots](https://github.com/arbadacarbaYK/trato/blob/main/README.md#screenshots). On GitHub releases, include
+Full gallery: [`../README.md`](../README.md#screenshots). On GitHub releases, include
 `docs/screenshots/` in the published repo so these images resolve.
 
 ## Health check
@@ -130,6 +130,6 @@ addresses need a **public hostname** — not localhost or a LAN IP.
 
 ## More detail
 
-- Developers: [`https://github.com/arbadacarbaYK/trato`](https://github.com/arbadacarbaYK/trato)
-- Wallets & operator: [`docs/OPERATOR_AND_WALLETS.md`](docs/OPERATOR_AND_WALLETS.md)
-- Operator extension: [`https://github.com/arbadacarbaYK/trato_operator/blob/main/README.md`](https://github.com/arbadacarbaYK/trato_operator/blob/main/README.md)
+- Developers: [`../SETUP_INSTRUCTIONS.md`](../SETUP_INSTRUCTIONS.md)
+- Wallets & operator: [`../docs/OPERATOR_AND_WALLETS.md`](../docs/OPERATOR_AND_WALLETS.md)
+- Operator extension: [`../trato_operator/README.md`](../trato_operator/README.md)

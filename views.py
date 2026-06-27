@@ -57,6 +57,8 @@ def _gate(
     show_login: bool = False,
     show_extensions: bool = False,
     show_browse: bool = False,
+    continue_url: str = "",
+    continue_label: str = "Open offer in Trato",
     status_code: int = HTTPStatus.FORBIDDEN,
 ) -> HTMLResponse:
     return trato_renderer().TemplateResponse(
@@ -70,6 +72,8 @@ def _gate(
             "show_login": show_login,
             "show_extensions": show_extensions,
             "show_browse": show_browse,
+            "continue_url": continue_url,
+            "continue_label": continue_label,
         },
         status_code=status_code,
     )
@@ -106,7 +110,25 @@ async def index(
     user: User | None = Depends(_optional_user),
 ):
     """Trato client UI — browse-only redirect when anonymous; full app when enabled."""
+    offer_qs = request.url.query
+    has_offer = bool(request.query_params.get("offer"))
+    trade_continue = f"/trato/?{offer_qs}" if has_offer else ""
+
     if user is None:
+        if has_offer:
+            return _gate(
+                request,
+                title="Log in to take this offer",
+                lead="This link opens the offer in Trato after you sign in to LNbits.",
+                hint=(
+                    "1. Log in below · 2. Enable Trato under Extensions if prompted · "
+                    "3. Use “Open offer in Trato” again (or refresh this page)."
+                ),
+                show_login=True,
+                show_browse=True,
+                continue_url=trade_continue,
+                status_code=HTTPStatus.UNAUTHORIZED,
+            )
         return RedirectResponse(url="/trato/book", status_code=HTTPStatus.FOUND)
 
     async with lnbits_db.connect() as conn:
@@ -120,6 +142,7 @@ async def index(
             hint="LNbits → Extensions → Trato → Enable. You can browse live offers without enabling.",
             show_extensions=True,
             show_browse=True,
+            continue_url=trade_continue,
             status_code=HTTPStatus.FORBIDDEN,
         )
 

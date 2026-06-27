@@ -22,14 +22,19 @@
     <p class="trato-gate__detail">{{ detail }}</p>
     {% endif %}
     <div class="trato-gate__actions">
-      {% if show_browse %}
-      <a class="trato-gate__btn trato-gate__btn--primary" href="/trato/book">
-        Browse live offers
-      </a>
-      {% endif %}
       {% if show_login %}
       <a class="trato-gate__btn trato-gate__btn--primary" href="/">
         Log in to LNbits
+      </a>
+      {% endif %}
+      {% if continue_url %}
+      <a class="trato-gate__btn{% if not show_login %} trato-gate__btn--primary{% endif %}" href="{{ continue_url }}">
+        {{ continue_label }}
+      </a>
+      {% endif %}
+      {% if show_browse %}
+      <a class="trato-gate__btn{% if not show_login and not continue_url %} trato-gate__btn--primary{% endif %}" href="/trato/book">
+        Browse live offers
       </a>
       {% endif %}
       {% if show_extensions %}

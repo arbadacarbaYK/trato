@@ -2166,9 +2166,29 @@ window.app = Vue.createApp({
         localStorage.setItem('trato_dismiss_settings_help', '1')
       } catch (e) {}
     },
-    loadMarketPrice() {
-      const code = this.marketFiatCode()
-      if (!code) return
+    marketPriceFiatChain() {
+      const chain = []
+      const push = c => {
+        const code = String(c || '').trim().toUpperCase()
+        if (code && !chain.includes(code)) chain.push(code)
+      }
+      push(this.filters.fiat)
+      const h = this.health || {}
+      push(h.default_fiat_code)
+      push(h.instance_fiat_code)
+      push('USD')
+      push('EUR')
+      return chain
+    },
+    loadMarketPrice(startIdx = 0) {
+      const chain = this.marketPriceFiatChain()
+      const code = chain[startIdx]
+      if (!code) {
+        this.marketPrice.sats_per_fiat = null
+        this.marketPrice.btc_price = null
+        this.marketPrice.loading = false
+        return
+      }
       this.marketPrice.loading = true
       LNbits.api
         .request('GET', `/trato/api/v1/price?fiat=${encodeURIComponent(code)}`)
@@ -2176,13 +2196,16 @@ window.app = Vue.createApp({
           this.marketPrice.fiat_code = res.data.fiat_code
           this.marketPrice.sats_per_fiat = res.data.sats_per_fiat
           this.marketPrice.btc_price = res.data.btc_price
+          this.marketPrice.loading = false
         })
         .catch(() => {
-          this.marketPrice.sats_per_fiat = null
-          this.marketPrice.btc_price = null
-        })
-        .finally(() => {
-          this.marketPrice.loading = false
+          if (startIdx + 1 < chain.length) {
+            this.loadMarketPrice(startIdx + 1)
+          } else {
+            this.marketPrice.sats_per_fiat = null
+            this.marketPrice.btc_price = null
+            this.marketPrice.loading = false
+          }
         })
     },
     marketFiatCode() {
@@ -4308,6 +4331,12 @@ window.app = Vue.createApp({
     }
   },
   watch: {
+    'settingsForm.demo_mode'(enabled) {
+      if (enabled) this.settingsForm.mainnet_enabled = false
+    },
+    'settingsForm.mainnet_enabled'(enabled) {
+      if (enabled) this.settingsForm.demo_mode = false
+    },
     'filters.fiat'() {
       this.loadMarketPrice()
     },
