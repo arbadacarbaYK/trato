@@ -375,6 +375,13 @@ body.body--dark .trato-fee-expand {
   font-weight: 700;
 }
 
+.trato-pm-chip--match.q-chip {
+  background: rgba(46, 125, 50, 0.12);
+  color: #1b5e20;
+  border-color: rgba(46, 125, 50, 0.52);
+  box-shadow: 0 0 0 1px rgba(46, 125, 50, 0.12);
+}
+
 .trato-pm-match {
   font-size: 0.8125rem;
   font-weight: 500;
@@ -392,6 +399,13 @@ body.body--dark .trato-pm-chip--more.q-chip {
   background: rgba(255, 255, 255, 0.1);
   color: rgba(255, 255, 255, 0.88);
   border-color: rgba(255, 255, 255, 0.28);
+}
+
+body.body--dark .trato-pm-chip--match.q-chip {
+  background: rgba(129, 199, 132, 0.2);
+  color: #c8e6c9;
+  border-color: rgba(129, 199, 132, 0.58);
+  box-shadow: 0 0 0 1px rgba(129, 199, 132, 0.15);
 }
 
 body.body--dark .trato-pm-match {

@@ -607,10 +607,13 @@
                   v-for="(pm, i) in paymentMethodsDisplay(o)"
                   :key="i"
                   square
-                  class="trato-pm-chip"
+                  :class="['trato-pm-chip', { 'trato-pm-chip--match': paymentMethodMatchesMine(pm) }]"
                 >
                   <span class="trato-pm-chip__text">{{ pm }}</span>
                   <q-tooltip v-if="pm.length > 28" max-width="320px">{{ pm }}</q-tooltip>
+                  <q-tooltip v-else-if="paymentMethodMatchesMine(pm)" max-width="280px">
+                    Matches your payment profile
+                  </q-tooltip>
                 </q-chip>
                 <q-chip
                   v-if="paymentMethodsMoreCount(o)"
@@ -620,13 +623,6 @@
                   +{{ paymentMethodsMoreCount(o) }}
                   <q-tooltip max-width="360px">{{ paymentMethodsFullLabel(o) }}</q-tooltip>
                 </q-chip>
-              </div>
-              <div
-                v-if="matchingPaymentLabels(o).length && userSideIfTake(o.kind) === 'buy'"
-                class="trato-pm-match q-mt-xs ellipsis-2-lines"
-              >
-                <q-icon name="check_circle" size="13px"></q-icon>
-                You can pay: {{ matchingPaymentLabels(o).join(', ') }}
               </div>
             </q-card-section>
 
@@ -1587,7 +1583,7 @@
               v-for="(pm, i) in expandPaymentMethods(detailDialog.order.payment_methods)"
               :key="i"
               square
-              class="trato-pm-chip"
+              :class="['trato-pm-chip', { 'trato-pm-chip--match': paymentMethodMatchesMine(pm) }]"
             >
               <span class="trato-pm-chip__text trato-pm-chip__text--detail">{{ pm }}</span>
             </q-chip>

@@ -2995,6 +2995,10 @@ window.app = Vue.createApp({
     paymentMethodsFullLabel(order) {
       return this.expandPaymentMethods(order.payment_methods).join(' · ')
     },
+    paymentMethodMatchesMine(pm) {
+      if (!this.paymentDetailsForm.profiles.length) return false
+      return this.paymentDetailsForm.profiles.some(p => this.profileMatchesPm(p, pm))
+    },
     matchingPaymentLabels(order) {
       const pms = order.payment_methods || []
       const hits = []
