@@ -7,6 +7,7 @@
     <title>Trato — public order book</title>
     <link rel="icon" type="image/png" href="{{ static_url_for('trato/static', 'image/favicon-32.png') }}" />
     <link rel="apple-touch-icon" href="{{ static_url_for('trato/static', 'image/trato-192.png') }}" />
+    <link rel="stylesheet" href="{{ static_url_for('trato/static', 'css/trato.css') }}" />
     <link rel="stylesheet" href="{{ static_url_for('trato/static', 'css/public_book.css') }}" />
   </head>
   <body>
@@ -90,13 +91,14 @@
             <option value="takeable_first">Take in Trato first</option>
           </select>
         </div>
-        <label class="pb-check">
-          <input type="checkbox" id="pb-mostro" />
-          Mostro only (take in Trato)
+        <label class="pb-check" id="pb-takeable-label">
+          <input type="checkbox" id="pb-takeable" />
+          <span id="pb-takeable-text">Take in Trato</span>
         </label>
       </div>
 
       <div class="pb-stats" id="pb-stats"></div>
+      <div id="pb-deals" class="pb-deals" hidden></div>
       <div id="pb-status" class="pb-loading">Loading live offers…</div>
       <div id="pb-sections" hidden></div>
     </div>
@@ -114,6 +116,17 @@
     </script>
     <script src="{{ static_url_for('trato/static', 'js/avatar.js') }}"></script>
     <script src="{{ static_url_for('trato/static', 'js/orderbook_sort.js') }}"></script>
+    <script src="{{ static_url_for('trato/static', 'i18n/en.js') }}"></script>
+    <script src="{{ static_url_for('trato/static', 'i18n/pi.js') }}"></script>
+    <script src="{{ static_url_for('trato/static', 'i18n/ru.js') }}"></script>
+    <script src="{{ static_url_for('trato/static', 'i18n/zh.js') }}"></script>
+    <script src="{{ static_url_for('trato/static', 'i18n/ja.js') }}"></script>
+    <script src="{{ static_url_for('trato/static', 'i18n/nl.js') }}"></script>
+    <script src="{{ static_url_for('trato/static', 'i18n/es.js') }}"></script>
+    <script src="{{ static_url_for('trato/static', 'i18n/pt.js') }}"></script>
+    <script src="{{ static_url_for('trato/static', 'i18n/fr.js') }}"></script>
+    <script src="{{ static_url_for('trato/static', 'i18n/merge.js') }}"></script>
+    <script src="{{ static_url_for('trato/static', 'js/fiat_sats.js') }}"></script>
     <script src="{{ static_url_for('trato/static', 'js/public_book.js') }}"></script>
   </body>
 </html>

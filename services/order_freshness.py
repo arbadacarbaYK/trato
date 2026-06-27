@@ -8,11 +8,17 @@ from ..mostro.orderbook import PublicOrder
 
 
 def order_expires_at_unix(order: PublicOrder) -> int | None:
-    """Best-effort expiry timestamp (``expiration`` or ``expires_at`` tag)."""
-    if order.expiration is not None:
-        return order.expiration
+    """When a pending offer should leave the book (NIP-69 ``expires_at``).
+
+    RoboSats encodes order expiry in the first ``expiration`` tag value (see
+    ``api/nostr.py`` in the RoboSats repo). Plain NIP-40 ``expiration`` alone
+    is relay event TTL — do not treat that as order expiry for other platforms.
+    """
     if order.expires_at is not None:
         return order.expires_at
+    plat = (order.platform or "").strip().lower()
+    if plat == "robosats" and order.expiration is not None:
+        return order.expiration
     return None
 
 

@@ -1,6 +1,12 @@
 /* Trato extension styling. Restrained, calm, premium.
    References Quasar tokens where possible; only structural extras here. */
 
+/* Belt-and-suspenders with inline head CSS: no raw icon-name flash. */
+html.trato-icons-pending .trato-page .material-icons,
+html.trato-icons-pending .trato-page .q-icon {
+  visibility: hidden;
+}
+
 .trato-page {
   width: 100%;
   max-width: none;
@@ -312,7 +318,29 @@ body.body--dark .trato-fee-expand {
   min-width: 0;
   transition:
     transform 0.12s ease,
-    box-shadow 0.12s ease;
+    box-shadow 0.12s ease,
+    border-color 0.12s ease;
+}
+
+/* Order-book side tint — full border shorthand (Quasar q-card--bordered ignores border-color). */
+.trato-page .trato-order-card--buy.q-card {
+  border: 1px solid rgba(67, 160, 71, 0.58);
+  box-shadow: 0 0 0 1px rgba(67, 160, 71, 0.1);
+}
+
+.trato-page .trato-order-card--sell.q-card {
+  border: 1px solid rgba(229, 57, 53, 0.58);
+  box-shadow: 0 0 0 1px rgba(229, 57, 53, 0.1);
+}
+
+body.body--dark .trato-page .trato-order-card--buy.q-card {
+  border: 1px solid rgba(129, 199, 132, 0.62);
+  box-shadow: 0 0 0 1px rgba(129, 199, 132, 0.12);
+}
+
+body.body--dark .trato-page .trato-order-card--sell.q-card {
+  border: 1px solid rgba(239, 154, 154, 0.62);
+  box-shadow: 0 0 0 1px rgba(239, 154, 154, 0.12);
 }
 
 /* Keep Take / Open Peach / info pinned to the card footer (variable PM tag height). */
@@ -456,6 +484,29 @@ body.body--dark .trato-pm-match {
 
 .trato-dispute-banner {
   border-radius: 10px;
+}
+
+body.body--dark .trato-completed-banner.bg-green-2 {
+  background: rgba(46, 125, 50, 0.22) !important;
+  color: #c8e6c9 !important;
+}
+
+.trato-privacy-tip {
+  border-radius: 10px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+body.body--dark .trato-privacy-tip {
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.trato-privacy-steps {
+  margin: 0;
+  padding-left: 1.25rem;
+}
+
+.trato-privacy-steps li {
+  line-height: 1.45;
 }
 
 .trato-trade-actions {

@@ -13,9 +13,11 @@ window.TRATO_LOCALE.en = {
       share_public: 'Share public order book (no login)',
       refresh_rate: 'Refresh rate (LNbits market feed)',
       toggle_trato_only:
-        'Hides Peach, HodlHodl, and other browse-only ads. Shows only offers Trato can take (Mostro and RoboSats).',
+        'Hides Peach, HodlHodl, and other browse-only ads. Shows only offers you can take in Trato (Mostro and RoboSats).',
       toggle_match_payments:
-        'Show only offers whose payment tags match a method you saved (e.g. SEPA Instant vs standard SEPA). Country comes from your IBAN, not from the order — EUR alone does not mean Germany.'
+        'Show only offers whose payment tags match a method you saved (e.g. SEPA Instant vs standard SEPA). Country comes from your IBAN, not from the order — EUR alone does not mean Germany.',
+      take_bond_robosats:
+        'Trato claims this offer and pays the taker bond. Finish escrow and fiat on RoboSats.'
     },
     share: {
       header: 'Public browse link',
@@ -38,6 +40,28 @@ window.TRATO_LOCALE.en = {
       body_after:
         'on this server or any other LNbits instance that runs Trato.'
     },
+    public_book: {
+      open_in_trato: 'Open in Trato',
+      best_deals: {
+        title: 'Best deals',
+        subtitle_buy:
+          'All-in estimate for buying BTC: premium + half escrow fee · {fiat}',
+        subtitle_sell:
+          'All-in estimate for selling BTC: premium − half escrow fee · {fiat}',
+        pick_filters:
+          'Pick a currency and Buy or Sell above to compare the best offers.',
+        fee_est: '~{pct}% fee',
+        fees_unknown: 'fees n/a',
+        premium_only: 'premium only',
+        note:
+          'Mostro offers include estimated escrow fee; other platforms show premium only.',
+        effective: '{score} all-in',
+        vs_market: '{premium} vs market'
+      },
+      filter_take_in_trato: 'Take in Trato',
+      uncheck_takeable:
+        ' Uncheck “Take in Trato” to see Peach, HodlHodl, and other browse-only platforms on the relays.'
+    },
     filters: {
       i_want_to: 'I want to',
       currency: 'Currency',
@@ -49,7 +73,7 @@ window.TRATO_LOCALE.en = {
       onchain: 'On-chain',
       payment_method: 'Payment method',
       payment_method_empty: 'No matching methods on this book',
-      trato_only: 'Only offers Trato can take (Mostro & RoboSats)',
+      trato_only: 'Take in Trato',
       match_payments: 'Match my payment methods',
       sort_by: 'Sort by'
     },
@@ -95,7 +119,7 @@ window.TRATO_LOCALE.en = {
         'on your relays right now — {summary}. Open RoboSats / Peach in their own apps to trade those ads.',
       no_mostro_trato_only_title: 'No takeable offers on the book',
       no_mostro_trato_only_body:
-        'Your relays have {summary} but nothing Trato can take yet. Turn off “Only offers Trato can take” to browse them, or stay in Demo mode for sample Mostro offers.',
+        'Your relays have {summary} but nothing Trato can take yet. Turn off “Take in Trato” to browse them, or stay in Demo mode for sample Mostro offers.',
       offer: 'offer',
       offers: 'offers',
       mostro: 'Mostro',
@@ -123,7 +147,7 @@ window.TRATO_LOCALE.en = {
       fiat_filtered:
         'No {code} offers match your filters. Taking a trade in Trato does not remove ads from the public book.',
       fiat_filtered_trato_only:
-        ' Turn off “Only offers Trato can take” — many EUR ads are RoboSats/Peach.',
+        ' Turn off “Take in Trato” — many EUR ads are RoboSats/Peach.',
       platform_take: 'Trato can take {platform} offers',
       platform_take_setup: ' once setup is complete',
       platform_take_live:
@@ -153,10 +177,12 @@ window.TRATO_LOCALE.en = {
     },
     buttons: {
       take: 'Take',
+      take_bond: 'Take (pay bond)',
       take_pending: 'Take…',
+      continue_robosats: 'Continue on RoboSats',
       fix_amount: 'Fix amount',
       payment_sent: 'Payment sent',
-      open_platform: 'Open {platform}',
+      open_platform: 'Open in {platform}',
       cancel: 'Cancel',
       delete: 'Delete',
       open: 'Open',
@@ -182,11 +208,15 @@ window.TRATO_LOCALE.en = {
         'Mostro — practice trades while Demo mode is on in Settings.',
       trading_mostro_practice:
         'Mostro — turn off Demo mode and enable mainnet + LND hold invoices for live escrow.',
-      trading_robosats_live: 'RoboSats — live take with your NWC wallet connected.',
+      robosats_bonds_title: 'RoboSats (taker bond only)',
+      robosats_bonds_body:
+        'Connect NWC to claim a live RoboSats offer and pay the taker bond. Escrow, chat, and fiat happen on the RoboSats coordinator — not in Trato. Demo mode walks through a practice trade locally.',
+      trading_robosats_live:
+        'RoboSats — claim offer + pay taker bond via NWC; finish the trade on RoboSats.',
       trading_robosats_demo:
-        'RoboSats — practice walk-through in Demo; connect NWC above for live take.',
+        'RoboSats — full practice walk-through in Demo (simulated). Connect NWC above to pay real taker bonds live.',
       trading_robosats_setup:
-        'RoboSats — connect NWC above for live take, or enable Demo mode to practise.',
+        'RoboSats — connect NWC above to pay taker bonds live, or use Demo mode to practise.',
       trading_browse_only:
         'Peach, lnp2pbot… — browse-only; open their app to trade.'
     },
@@ -266,7 +296,36 @@ window.TRATO_LOCALE.en = {
       rate_received: 'Rating received'
     },
     trade: {
-      dispute_banner_title: 'Dispute open — waiting for a solver'
+      dispute_banner_title: 'Dispute open — waiting for a solver',
+      pay_seller: 'Pay the seller',
+      pay_via: 'Pay via {method}',
+      payment_sent_hint:
+        'Use the reference from chat if needed. Then tap “Payment sent”.',
+      waiting_release:
+        'You marked payment as sent. The seller should release sats to your receive address — check the chat for updates.',
+      seller_release_title: 'Buyer marked payment as sent — release Bitcoin',
+      waiting_seller_pay: 'Waiting for the seller to share how to pay. Check the chat below.',
+      completed_title: 'Trade complete',
+      completed_onchain_buy:
+        'Bitcoin should arrive at your wallet address. Allow time for network confirmations.',
+      completed_lightning_buy:
+        'Sats should appear in your Lightning wallet shortly.',
+      completed_sell: 'You released the Bitcoin. This trade is done.',
+      privacy_tip_expand: 'Optional — improve privacy',
+      privacy_tip_expand_caption: 'Mix your coins so they are harder to link to this trade',
+      privacy_tip_intro:
+        'On-chain Bitcoin is public. You can optionally mix it with other people\'s coins — a process called coinjoin — so it is harder to trace back to this trade.',
+      privacy_tip_step1: 'Install Wasabi Wallet on your computer (free, open source)',
+      privacy_tip_step2: 'When your Bitcoin arrives, send it to your Wasabi wallet',
+      privacy_tip_step3: 'In Wasabi, start a coinjoin round — your coins get mixed with others',
+      privacy_tip_wasabi: 'Wasabi setup guide',
+      privacy_tip_guide: 'What is coinjoin?',
+      privacy_tip_dismiss: 'Don\'t show this again',
+      robosats_continue_banner:
+        'Taker bond paid. Continue escrow and fiat payment on RoboSats.',
+      robosats_live_chip: 'Bond paid — finish on RoboSats',
+      robosats_timeline_note:
+        'Bond paid in Trato. Escrow and fiat continue on RoboSats — use Continue on RoboSats above.'
     },
     notify: {
       copied: 'Copied',
@@ -281,7 +340,8 @@ window.TRATO_LOCALE.en = {
       enter_sats: 'Enter a sats amount or use market price',
       no_demo_trades: 'No demo trades to clear',
       profile_ready: 'Trader profile ready',
-      clearing_demo: 'Clearing demo trades…'
+      clearing_demo: 'Clearing demo trades…',
+      robosats_bond_paid: 'Taker bond paid — continue on RoboSats'
     },
     confirm: {
       cancel_order_title: 'Cancel this order?',
@@ -292,17 +352,10 @@ window.TRATO_LOCALE.en = {
     },
     detail: {
       pick_payment_method:
-        'Fees and the payment step use this rail — pick before you take.'
-    },
-    trade: {
-      pay_seller: 'Pay the seller',
-      pay_via: 'Pay via {method}',
-      payment_sent_hint:
-        'Use the reference from chat if needed. Then tap “Payment sent”.',
-      waiting_release:
-        'You marked payment as sent. The seller should release sats to your receive address — check the chat for updates.',
-      seller_release_title: 'Buyer marked payment as sent — release Bitcoin',
-      waiting_seller_pay: 'Waiting for the seller to share how to pay. Check the chat below.'
+        'Fees and the payment step use this rail — pick before you take.',
+      robosats_live_banner:
+        'Trato only claims this offer and pays the taker bond. Continue escrow and fiat on the RoboSats coordinator.',
+      robosats_live_link: 'Open on RoboSats'
     },
     market_hint: {
       default:

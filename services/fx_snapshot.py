@@ -16,16 +16,16 @@ from ..models import now
 
 async def capture_fx(fiat_code: str) -> dict[str, Any]:
     """Return a serializable FX snapshot for one fiat currency."""
-    from lnbits.utils.exchange_rates import get_fiat_rate_and_price_satoshis
+    from .fiat_price import fetch_fiat_price_quote, normalize_fiat_code
 
-    code = (fiat_code or "USD").strip().upper()
-    rate, btc_price = await get_fiat_rate_and_price_satoshis(code)
-    if not rate or rate <= 0:
-        raise ValueError(f"No exchange rate for {code}")
+    requested = normalize_fiat_code(fiat_code)
+    quote = await fetch_fiat_price_quote(requested)
     return {
-        "fiat_code": code,
-        "sats_per_fiat": float(rate),
-        "btc_price": float(btc_price),
+        "fiat_code": requested,
+        "price_fiat_code": quote["price_fiat_code"],
+        "sats_per_fiat": quote["sats_per_fiat"],
+        "btc_price": quote["btc_price"],
+        "resolved_via_alias": quote.get("resolved_via_alias", False),
         "captured_at": now(),
         "source": "lnbits_exchange_rates",
     }

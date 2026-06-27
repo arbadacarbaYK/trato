@@ -37,6 +37,7 @@ from .order_freshness import (
 )
 from .platforms import normalize_platform, platform_takeable, takeable_platforms_list, trading_capabilities
 from .robosats_federation import federation
+from .robosats_book import coordinator_api_order_id, fetch_coordinator_public_orders
 
 POLL_INTERVAL_SECONDS = 60
 FETCH_TIMEOUT_SECONDS = 15
@@ -307,6 +308,15 @@ class OrderbookService:
             return
         self._verify_task = asyncio.create_task(self._verify_external_book())
 
+    def _normalize_robosats_order(self, order: PublicOrder) -> PublicOrder:
+        plat = (order.platform or "").strip().lower()
+        if plat != "robosats":
+            return order
+        api_id = coordinator_api_order_id(order.id, order.source)
+        if api_id and api_id != order.id:
+            order.id = api_id
+        return order
+
     def _ingest_order_events(self, vec, seen_at: int) -> int:
         parsed = 0
         for ev in vec:
@@ -322,6 +332,7 @@ class OrderbookService:
                 order.mostro_pubkey
             ):
                 continue
+            order = self._normalize_robosats_order(order)
             key = self._key(order)
             existing = self._orders.get(key)
             if existing and (existing[0].event_created_at or 0) >= (
@@ -332,6 +343,27 @@ class OrderbookService:
                 self._store_order(order, seen_at)
             parsed += 1
         return parsed
+
+    def _ingest_order_events_rest(
+        self, orders: list[PublicOrder], seen_at: int
+    ) -> int:
+        """Merge coordinator REST book rows (live RoboSats when Nostr cache is stale)."""
+        stored = 0
+        for order in orders:
+            plat = (order.platform or "mostro").strip().lower()
+            if plat == "robosats" and not federation.passes_ingest_filter(
+                order.mostro_pubkey
+            ):
+                continue
+            order = self._normalize_robosats_order(order)
+            # Coordinator REST is authoritative when Nostr cache is stale.
+            self._store_order(order, seen_at)
+            key = self._key(order)
+            self._verified_external.add(key)
+            stored += 1
+        if stored:
+            logger.info(f"trato: RoboSats REST ingest stored {stored} live orders")
+        return stored
 
     async def poll_once(self) -> int:
         """Fetch + merge one cycle. Returns number of parsed orders."""
@@ -400,6 +432,10 @@ class OrderbookService:
                         f_rs, timedelta(seconds=FETCH_TIMEOUT_SECONDS)
                     )
                     parsed += self._ingest_order_events(rs_events.to_vec(), seen_at)
+
+            rest_orders = await fetch_coordinator_public_orders()
+            if rest_orders:
+                parsed += self._ingest_order_events_rest(rest_orders, seen_at)
 
             f_del = Filter().kind(Kind(KIND_DELETE)).limit(500).since(deletion_since_ts)
             del_events = await client.fetch_events(

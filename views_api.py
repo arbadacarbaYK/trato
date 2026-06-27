@@ -212,20 +212,27 @@ async def api_price(fiat: str = Query(..., min_length=2, max_length=8)):
     """Live market rate so the UI can bind fiat<->sats both ways.
 
     Returns ``sats_per_fiat`` (satoshis for one unit of fiat) and the BTC price.
-    Uses LNbits' own cached exchange-rate feed - no extra dependency.
+    Stablecoins (USDT/USDC) map to USD; the response includes ``price_fiat_code``
+    when an alias or fallback was used. Never silently substitutes ALL (Albanian Lek)
+    unless that is the requested ``fiat`` code.
     """
-    from lnbits.utils.exchange_rates import get_fiat_rate_and_price_satoshis
+    from lnbits.settings import settings as lnbits_settings
 
-    code = fiat.strip().upper()
+    from .services.fiat_price import fetch_fiat_price_quote
+
+    instance_fiat = (
+        lnbits_settings.lnbits_default_accounting_currency or "USD"
+    ).upper()
     try:
-        rate, price = await get_fiat_rate_and_price_satoshis(code)
-    except Exception as exc:  # noqa: BLE001
+        return await fetch_fiat_price_quote(
+            fiat,
+            instance_fiat=instance_fiat,
+        )
+    except ValueError as exc:
+        code = fiat.strip().upper()
         raise HTTPException(
             HTTPStatus.BAD_REQUEST, f"No exchange rate for {code}."
         ) from exc
-    if not rate or rate <= 0:
-        raise HTTPException(HTTPStatus.BAD_REQUEST, f"No exchange rate for {code}.")
-    return {"fiat_code": code, "sats_per_fiat": rate, "btc_price": price}
 
 
 # --- Health -----------------------------------------------------------------
@@ -1062,6 +1069,12 @@ async def api_take_order(
                     "rating": data.rating,
                     "bonded": data.bonded,
                 },
+                "public_source": (
+                    (data.source or (pub.source if pub else None) or "").strip() or None
+                ),
+                "platform_instance": (
+                    pub.platform_instance if pub and pub.platform_instance else None
+                ),
                 "settlement_layer": data.settlement_layer,
             }
         ),
@@ -1129,7 +1142,7 @@ async def api_take_order(
                 order,
                 "system",
                 "note",
-                "RoboSats taker bond paid via NWC — follow coordinator status in-app.",
+                "Bond paid in Trato — continue escrow and fiat on the RoboSats coordinator.",
             )
             await engine.store.update(order, status="active")
     else:

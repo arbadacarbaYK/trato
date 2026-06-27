@@ -59,21 +59,26 @@ class RoboSatsFederation:
     def coordinator_pubkeys(self) -> list[str]:
         return list(self._by_pubkey.keys())
 
+    def book_coordinators(self) -> list[tuple[str, str, str]]:
+        """(alias, nostr_hex_pubkey, clearnet_base) for coordinators with REST book."""
+        out: list[tuple[str, str, str]] = []
+        for alias, entry in self._meta.items():
+            mainnet = entry.get("mainnet") or {}
+            base = str(mainnet.get("clearnet") or "").strip().rstrip("/")
+            pk = str(entry.get("nostrHexPubkey") or "").strip().lower()
+            if base and pk:
+                out.append((alias, pk, base))
+        return out
+
     async def ensure_loaded(self) -> None:
         now = time.time()
         if self._by_pubkey and now - self._loaded_at < FEDERATION_TTL_SECONDS:
             return
-        try:
-            import httpx
-        except ImportError:
-            return
-        try:
-            async with httpx.AsyncClient(timeout=HTTP_TIMEOUT_SECONDS) as client:
-                resp = await client.get(FEDERATION_URL)
-                resp.raise_for_status()
-                data = resp.json()
-        except Exception as exc:  # noqa: BLE001
-            logger.warning(f"trato: RoboSats federation fetch failed: {exc}")
+        from .http_json import get_json
+
+        data = await get_json(FEDERATION_URL, timeout=HTTP_TIMEOUT_SECONDS)
+        if not isinstance(data, dict):
+            logger.warning("trato: RoboSats federation fetch failed or invalid JSON")
             return
         by_pk: dict[str, str] = {}
         by_alias: dict[str, str] = {}
@@ -99,25 +104,24 @@ class RoboSatsFederation:
             self._meta = meta
             self._loaded_at = now
 
-    async def verify_public_order(self, pubkey_hex: str, order_id: str) -> bool:
+    async def verify_public_order(
+        self, pubkey_hex: str, order_id: str, *, source: str | None = None
+    ) -> bool:
         """True when coordinator API reports the order is still public."""
         await self.ensure_loaded()
         base = self.coordinator_url(pubkey_hex)
         if not base:
             return False
-        try:
-            import httpx
-        except ImportError:
+        from .robosats_book import coordinator_api_order_id
+
+        api_id = coordinator_api_order_id(order_id, source)
+        from .http_json import get_json
+
+        url = f"{base}/api/order/{api_id}"
+        payload = await get_json(url, timeout=HTTP_TIMEOUT_SECONDS)
+        if not isinstance(payload, dict):
             return False
-        url = f"{base}/api/order/{order_id}"
         try:
-            async with httpx.AsyncClient(timeout=HTTP_TIMEOUT_SECONDS) as client:
-                resp = await client.get(url)
-            if resp.status_code == 404:
-                return False
-            if resp.status_code != 200:
-                return False
-            payload = resp.json()
             return payload.get("status") == ROBOSATS_STATUS_PUBLIC
         except Exception as exc:  # noqa: BLE001
             logger.debug(f"trato: RoboSats verify {order_id!r} failed: {exc!r}")

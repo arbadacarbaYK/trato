@@ -23,6 +23,7 @@ DEFAULT_RELAYS = [
     "wss://relay.damus.io",
     "wss://nostr.bitcoiner.social",
     "wss://relay.nostr.net",
+    "wss://nostr.robosats.org",
 ]
 
 
@@ -198,6 +199,7 @@ class TakeOrder(BaseModel):
     rating: Optional[dict] = None
     bonded: bool = False
     settlement_layer: str = "lightning"
+    source: Optional[str] = None  # RoboSats coordinator order URL (from book row)
 
     @validator("settlement_layer")
     def _settlement_layer_ok(cls, value):

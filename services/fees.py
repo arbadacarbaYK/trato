@@ -72,6 +72,20 @@ def estimate_trade_fees(
     }
 
 
+def net_sats_for_side(amount_sats: int, estimate: dict, *, side: str) -> int | None:
+    """Buyer net after fee share; seller gross locked in escrow."""
+    if estimate.get("market_price") or amount_sats <= 0:
+        return None
+    share = (
+        estimate["buyer_fee_sats"]
+        if side == "buy"
+        else estimate["seller_fee_sats"]
+    )
+    if side == "buy":
+        return amount_sats - int(share)
+    return amount_sats
+
+
 def fee_summary_line(estimate: dict, *, side: str) -> str:
     """One-line human summary for buyer or seller role in the trade."""
     if estimate.get("market_price"):

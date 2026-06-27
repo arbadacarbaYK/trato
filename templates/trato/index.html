@@ -1,4 +1,39 @@
 {% extends "base.html" %} {% from "macros.jinja" import window_vars with context %}
+{% block styles %}
+<link
+  rel="preload"
+  href="{{ static_url_for('static', 'fonts/material-icons-v50.woff2') }}"
+  as="font"
+  type="font/woff2"
+  crossorigin
+/>
+<link
+  rel="stylesheet"
+  href="{{ static_url_for('trato/static', 'css/trato.css') }}"
+/>
+<style>
+  /* Material Icons are ligatures: hide icon slots until the font is ready. */
+  html.trato-icons-pending .trato-page .material-icons,
+  html.trato-icons-pending .trato-page .q-icon {
+    visibility: hidden;
+  }
+</style>
+{% endblock %}
+{% block head_scripts %}
+<script>
+  document.documentElement.classList.add('trato-icons-pending')
+  if (document.fonts && document.fonts.load) {
+    document.fonts
+      .load('400 24px "Material Icons"')
+      .catch(function () {})
+      .finally(function () {
+        document.documentElement.classList.remove('trato-icons-pending')
+      })
+  } else {
+    document.documentElement.classList.remove('trato-icons-pending')
+  }
+</script>
+{% endblock %}
 {% block scripts %}
 {% if public_view %}
 <script>
@@ -15,14 +50,18 @@
   window.TRATO_MOBILE_MONEY_COUNTRIES = {{ mobile_money_countries_json | safe }};
   window.TRATO_ICON_URL = "{{ static_url_for('trato/static', 'image/trato.png') }}";
 </script>
-<link
-  rel="stylesheet"
-  href="{{ static_url_for('trato/static', 'css/trato.css') }}"
-/>
+<script src="{{ static_url_for('trato/static', 'js/fiat_sats.js') }}"></script>
 <script src="{{ static_url_for('trato/static', 'js/avatar.js') }}"></script>
 <script src="{{ static_url_for('trato/static', 'js/orderbook_sort.js') }}"></script>
 <script src="{{ static_url_for('trato/static', 'i18n/en.js') }}"></script>
 <script src="{{ static_url_for('trato/static', 'i18n/pi.js') }}"></script>
+<script src="{{ static_url_for('trato/static', 'i18n/ru.js') }}"></script>
+<script src="{{ static_url_for('trato/static', 'i18n/zh.js') }}"></script>
+<script src="{{ static_url_for('trato/static', 'i18n/ja.js') }}"></script>
+<script src="{{ static_url_for('trato/static', 'i18n/nl.js') }}"></script>
+<script src="{{ static_url_for('trato/static', 'i18n/es.js') }}"></script>
+<script src="{{ static_url_for('trato/static', 'i18n/pt.js') }}"></script>
+<script src="{{ static_url_for('trato/static', 'i18n/fr.js') }}"></script>
 <script src="{{ static_url_for('trato/static', 'i18n/merge.js') }}"></script>
 <script src="{{ static_url_for('trato/static', 'js/index.js') }}"></script>
 {% endblock %} {% block page %} {% raw %}
@@ -410,8 +449,12 @@
               v-for="o in section.orders"
               :key="o.mostro_pubkey + ':' + o.id"
               flat
-              bordered
-              class="trato-order-card full-height"
+              :class="[
+                'trato-order-card full-height',
+                userSideIfTake(o.kind) === 'buy'
+                  ? 'trato-order-card--buy'
+                  : 'trato-order-card--sell'
+              ]"
             >
             <q-card-section class="q-pb-xs">
               <div class="row items-center no-wrap">
@@ -633,11 +676,18 @@
               <q-btn
                 v-if="platformTratoSupports(o)"
                 unelevated
-                color="primary"
+                :color="userChipColor(userSideIfTake(o.kind))"
                 no-caps
-                :label="$t('trato.buttons.take')"
+                :label="takeButtonLabel(o)"
                 @click="openOrderFromBook(o)"
-              ></q-btn>
+              >
+                <q-tooltip
+                  v-if="isLiveRoboSatsBookOrder(o)"
+                  max-width="300px"
+                >
+                  {{ t('tooltips.take_bond_robosats') }}
+                </q-tooltip>
+              </q-btn>
               <q-btn
                 v-else
                 flat
@@ -1233,12 +1283,9 @@
                 color="red"
               ></q-toggle>
               <q-separator class="q-my-sm"></q-separator>
-              <div class="text-subtitle2 text-weight-bold">RoboSats (live bonds)</div>
+              <div class="text-subtitle2 text-weight-bold">{{ $t('trato.settings.robosats_bonds_title') }}</div>
               <div class="text-caption text-grey q-mb-sm">
-                Optional NWC wallet connection for paying RoboSats taker bonds in live
-                mode, and for receiving sats via Lightning invoice when you buy Bitcoin.
-                Encrypted at rest — never shown again after save. Demo mode does not
-                need NWC.
+                {{ $t('trato.settings.robosats_bonds_body') }}
               </div>
               <q-input
                 v-model="settingsForm.nwc_uri"
@@ -1441,6 +1488,29 @@
           </span>
         </div>
       </q-card-section>
+
+      <q-banner
+        v-if="isLiveRoboSatsBookOrder(detailDialog.order)"
+        dense
+        rounded
+        class="bg-amber-2 text-amber-10 q-mx-md q-mb-sm"
+      >
+        <template v-slot:avatar>
+          <q-icon name="info" color="amber-9"></q-icon>
+        </template>
+        <div class="text-body2">{{ t('detail.robosats_live_banner') }}</div>
+        <template v-slot:action>
+          <q-btn
+            flat
+            no-caps
+            color="amber-10"
+            :label="t('detail.robosats_live_link')"
+            icon="open_in_new"
+            @click="openRoboSatsCoordinator(detailDialog.order)"
+          ></q-btn>
+        </template>
+      </q-banner>
+
       <q-separator></q-separator>
 
       <!-- Reputation -->
@@ -1724,12 +1794,19 @@
         <q-btn
           v-if="platformTratoSupports(detailDialog.order)"
           unelevated
-          color="primary"
+          :color="userChipColor(userSideIfTake(detailDialog.order.kind))"
           no-caps
           :disable="!canTakeOrder(detailDialog.order)"
           :label="takeButtonLabel(detailDialog.order)"
           @click="explainTakeOrder(detailDialog.order)"
-        ></q-btn>
+        >
+          <q-tooltip
+            v-if="isLiveRoboSatsBookOrder(detailDialog.order)"
+            max-width="300px"
+          >
+            {{ t('tooltips.take_bond_robosats') }}
+          </q-tooltip>
+        </q-btn>
         <q-btn
           v-else
           flat
@@ -1773,6 +1850,19 @@
                 </q-tooltip>
               </q-chip>
               <q-chip
+                v-else-if="isLiveRoboSatsOrder(tradeDialog.order)"
+                dense
+                size="sm"
+                color="amber-2"
+                text-color="amber-10"
+                class="trato-trade-live-chip"
+              >
+                Live
+                <q-tooltip max-width="300px">
+                  {{ t('trade.robosats_live_chip') }}
+                </q-tooltip>
+              </q-chip>
+              <q-chip
                 v-else
                 dense
                 size="sm"
@@ -1805,8 +1895,8 @@
                 <template v-if="tradeDialog.order.amount_sats">
                   {{ formatSats(tradeDialog.order.amount_sats) }} sats
                 </template>
-                <template v-else-if="tradeDialog.order.fiat_amount && marketPrice.sats_per_fiat">
-                  ≈ {{ formatSats(Math.round(tradeDialog.order.fiat_amount * marketPrice.sats_per_fiat)) }} sats est.
+                <template v-else-if="tradeSatsEstimate(tradeDialog.order)">
+                  ≈ {{ formatSats(tradeSatsEstimate(tradeDialog.order)) }} sats est.
                 </template>
                 <template v-else>market price</template>
               </span>
@@ -1833,6 +1923,97 @@
         <div class="text-weight-medium">{{ t('trade.dispute_banner_title') }}</div>
         <div class="text-caption q-mt-xs">{{ tradeDisputeBannerDetail }}</div>
       </q-banner>
+
+      <q-banner
+        v-if="isLiveRoboSatsOrder(tradeDialog.order)"
+        dense
+        rounded
+        class="trato-robosats-continue-banner q-ma-md bg-amber-2 text-amber-10"
+      >
+        <template v-slot:avatar>
+          <q-icon name="open_in_new" color="amber-9"></q-icon>
+        </template>
+        <div class="text-weight-medium">{{ t('trade.robosats_continue_banner') }}</div>
+        <div class="text-caption q-mt-xs">{{ t('trade.robosats_timeline_note') }}</div>
+      </q-banner>
+
+      <q-card-section
+        v-if="isLiveRoboSatsOrder(tradeDialog.order)"
+        class="q-pt-none q-pb-sm"
+      >
+        <q-btn
+          unelevated
+          color="primary"
+          no-caps
+          class="full-width"
+          icon="open_in_new"
+          :label="t('buttons.continue_robosats')"
+          @click="openRoboSatsCoordinator(tradeDialog.order)"
+        ></q-btn>
+      </q-card-section>
+
+      <q-banner
+        v-if="showTradeCompletedBanner"
+        dense
+        rounded
+        class="trato-completed-banner q-ma-md bg-green-2 text-green-10"
+      >
+        <template v-slot:avatar>
+          <q-icon name="check_circle" color="green-8"></q-icon>
+        </template>
+        <div class="text-weight-medium">{{ t('trade.completed_title') }}</div>
+        <div class="text-caption q-mt-xs">{{ tradeCompletedMessage }}</div>
+      </q-banner>
+
+      <q-expansion-item
+        v-if="showOnchainPrivacyTip"
+        dense
+        expand-separator
+        icon="shield"
+        class="trato-privacy-tip q-mx-md q-mb-sm"
+        :label="t('trade.privacy_tip_expand')"
+        :caption="t('trade.privacy_tip_expand_caption')"
+      >
+        <q-card-section class="q-pt-none q-pb-sm">
+          <div class="text-caption text-grey-8 q-mb-sm">{{ t('trade.privacy_tip_intro') }}</div>
+          <ol class="trato-privacy-steps text-caption q-pl-md q-mb-sm">
+            <li class="q-mb-xs">{{ t('trade.privacy_tip_step1') }}</li>
+            <li class="q-mb-xs">{{ t('trade.privacy_tip_step2') }}</li>
+            <li>{{ t('trade.privacy_tip_step3') }}</li>
+          </ol>
+          <div class="row q-gutter-sm q-mt-sm">
+            <q-btn
+              unelevated
+              no-caps
+              size="sm"
+              color="primary"
+              icon="open_in_new"
+              :label="t('trade.privacy_tip_wasabi')"
+              @click="openPrivacyLink('wasabi')"
+            ></q-btn>
+            <q-btn
+              flat
+              no-caps
+              size="sm"
+              color="grey-8"
+              icon="open_in_new"
+              :label="t('trade.privacy_tip_guide')"
+              @click="openPrivacyLink('guide')"
+            ></q-btn>
+          </div>
+          <div class="q-mt-sm">
+            <q-btn
+              flat
+              dense
+              no-caps
+              size="sm"
+              color="grey-7"
+              :label="t('trade.privacy_tip_dismiss')"
+              @click="dismissPrivacyTip"
+            ></q-btn>
+          </div>
+        </q-card-section>
+      </q-expansion-item>
 
       <q-card-section v-if="identity" class="trato-trade-parties q-py-sm">
         <div class="row q-col-gutter-sm">
@@ -2076,7 +2257,7 @@
 
       <!-- Buyer: pay seller -->
       <q-card-section
-        v-if="tradeDialog.order.side === 'buy' && tradeDialog.sellerPayment"
+        v-if="showTratoTradeSteps && tradeDialog.order.side === 'buy' && tradeDialog.sellerPayment"
         class="trato-panel trato-panel--accent-green q-pb-sm"
       >
         <div class="text-subtitle2 text-weight-bold q-mb-xs">
@@ -2109,7 +2290,7 @@
         </div>
       </q-card-section>
       <q-card-section
-        v-else-if="tradeDialog.order.side === 'buy' && tradeDialog.order.status === 'fiat-sent'"
+        v-else-if="showTratoTradeSteps && tradeDialog.order.side === 'buy' && tradeDialog.order.status === 'fiat-sent'"
         class="trato-panel trato-panel--accent-purple q-py-sm"
       >
         <div class="text-subtitle2 text-weight-bold q-mb-xs">
@@ -2120,7 +2301,7 @@
         </div>
       </q-card-section>
       <q-card-section
-        v-else-if="tradeDialog.order.side === 'buy'"
+        v-else-if="showTratoTradeSteps && tradeDialog.order.side === 'buy'"
         class="trato-panel q-py-sm"
       >
         <div class="text-caption text-grey-8">
@@ -2130,7 +2311,7 @@
 
       <!-- Seller: share payment -->
       <q-card-section
-        v-if="tradeDialog.order.side === 'sell'"
+        v-if="showTratoTradeSteps && tradeDialog.order.side === 'sell'"
         class="q-pb-sm"
       >
         <div class="text-caption text-grey-8 q-mb-xs">
@@ -2178,7 +2359,7 @@
 
       <!-- Seller: buyer marked fiat sent — release Bitcoin -->
       <q-card-section
-        v-if="tradeDialog.order.side === 'sell' && tradeDialog.order.status === 'fiat-sent'"
+        v-if="showTratoTradeSteps && tradeDialog.order.side === 'sell' && tradeDialog.order.status === 'fiat-sent'"
         class="trato-panel trato-panel--accent-purple q-pb-sm"
       >
         <div class="text-subtitle2 text-weight-bold q-mb-xs">
@@ -2198,7 +2379,9 @@
         </div>
       </q-card-section>
 
-      <q-separator v-if="tradeDialog.order.side === 'buy' || tradeDialog.order.side === 'sell'"></q-separator>
+      <q-separator
+        v-if="showTratoTradeSteps && (tradeDialog.order.side === 'buy' || tradeDialog.order.side === 'sell')"
+      ></q-separator>
 
       <!-- Timeline -->
       <q-card-section class="trato-timeline">
@@ -2226,7 +2409,7 @@
       <q-separator></q-separator>
 
       <!-- Chat input -->
-      <q-card-section class="q-pb-none">
+      <q-card-section v-if="showTratoTradeSteps" class="q-pb-none">
         <q-input
           v-model="tradeDialog.chatText"
           type="textarea"
@@ -2250,7 +2433,11 @@
       </q-card-section>
 
       <!-- Lifecycle actions -->
-      <q-card-actions align="left" class="trato-trade-actions q-gutter-xs q-px-md q-pb-md">
+      <q-card-actions
+        v-if="showTratoTradeSteps"
+        align="left"
+        class="trato-trade-actions q-gutter-xs q-px-md q-pb-md"
+      >
         <q-btn
           v-if="tradeDialog.allowed.includes('fiat-sent')"
           unelevated

@@ -298,8 +298,10 @@ window.app = Vue.createApp({
         fiat_code: null,
         sats_per_fiat: null,
         btc_price: null,
+        price_fiat_code: null,
         loading: false
       },
+      orderPriceQuotes: {},
       detailDialog: {
         show: false,
         order: null,
@@ -308,7 +310,8 @@ window.app = Vue.createApp({
         takeFiatAmount: null,
         quoteLoading: false,
         quoteSatsPerFiat: null,
-        quoteBtcPrice: null
+        quoteBtcPrice: null,
+        quotePriceFiatCode: null
       },
       loadErrors: {
         health: null,
@@ -335,6 +338,7 @@ window.app = Vue.createApp({
         buyerReceiveSummary: ''
       },
       tradesFocusId: null,
+      privacyTipDismissed: false,
     }
   },
   computed: {
@@ -666,6 +670,12 @@ window.app = Vue.createApp({
         e => e.direction === 'system' || e.kind === 'chat'
       )
     },
+    showTratoTradeSteps() {
+      const o = this.tradeDialog.order
+      if (!o || this.isTradeTerminal(o)) return false
+      if (this.isLiveRoboSatsOrder(o)) return false
+      return true
+    },
     tradeDisputeBannerDetail() {
       const o = this.tradeDialog.order
       if (!o || o.status !== 'dispute') return ''
@@ -688,7 +698,7 @@ window.app = Vue.createApp({
     },
     demoLightningPanel() {
       const o = this.tradeDialog.order
-      if (!o || !o.demo) return null
+      if (!o || !o.demo || this.isTradeTerminal(o)) return null
       const sats = o.amount_sats || 0
       if (o.side === 'buy' && o.buyer_invoice) {
         return {
@@ -714,7 +724,7 @@ window.app = Vue.createApp({
     },
     demoOnchainPanel() {
       const o = this.tradeDialog.order
-      if (!o || !o.demo) return null
+      if (!o || !o.demo || this.isTradeTerminal(o)) return null
       let layer = 'lightning'
       try {
         const meta = JSON.parse(o.order_json || '{}')
@@ -733,6 +743,28 @@ window.app = Vue.createApp({
         address: `bc1qDEMO${ref}onchainnotreal`,
         sats: sats
       }
+    },
+    showTradeCompletedBanner() {
+      const o = this.tradeDialog.order
+      return !!(o && o.status === 'success')
+    },
+    tradeCompletedMessage() {
+      const o = this.tradeDialog.order
+      if (!o) return ''
+      if (o.side === 'buy') {
+        return this.tradeSettlementLayer(o) === 'onchain'
+          ? this.t('trade.completed_onchain_buy')
+          : this.t('trade.completed_lightning_buy')
+      }
+      return this.t('trade.completed_sell')
+    },
+    showOnchainPrivacyTip() {
+      const o = this.tradeDialog.order
+      if (!o || this.privacyTipDismissed) return false
+      if (o.demo) return false
+      if (o.status !== 'success') return false
+      if (o.side !== 'buy') return false
+      return this.tradeSettlementLayer(o) === 'onchain'
     },
     intentFilterHint() {
       if (!this.filters.side) return ''
@@ -958,10 +990,13 @@ window.app = Vue.createApp({
     },
     formatLocaleInteger(n) {
       if (n === null || n === undefined || Number.isNaN(Number(n))) return '—'
-      return Math.round(Number(n)).toLocaleString(undefined, {
-        maximumFractionDigits: 0,
-        minimumFractionDigits: 0
-      })
+      return (window.TratoFiatSats || {}).formatSats
+        ? window.TratoFiatSats.formatSats(n)
+        : Math.round(Number(n)).toLocaleString('en-US', {
+            maximumFractionDigits: 0,
+            minimumFractionDigits: 0,
+            useGrouping: true
+          })
     },
     formatSats(n) {
       return this.formatLocaleInteger(n)
@@ -1001,6 +1036,42 @@ window.app = Vue.createApp({
         dispute: 'Dispute'
       }
       return map[status] || String(status || '').replace(/-/g, ' ')
+    },
+    isTradeTerminal(order) {
+      if (!order) return false
+      const s = String(order.status || '').toLowerCase()
+      return [
+        'success',
+        'canceled',
+        'cancelled',
+        'expired',
+        'cooperatively-canceled'
+      ].includes(s)
+    },
+    tradeSettlementLayer(order) {
+      if (!order) return 'lightning'
+      try {
+        const meta = JSON.parse(order.order_json || '{}')
+        return String(meta.settlement_layer || 'lightning').toLowerCase()
+      } catch (e) {
+        return 'lightning'
+      }
+    },
+    openPrivacyLink(kind) {
+      const urls = {
+        wasabi: 'https://wasabi.kravens.nl/',
+        guide: 'https://coinjoin.nl/index.html'
+      }
+      const url = urls[kind]
+      if (url) window.open(url, '_blank', 'noopener,noreferrer')
+    },
+    dismissPrivacyTip() {
+      try {
+        localStorage.setItem('trato_privacy_tip_dismissed', '1')
+      } catch (e) {
+        /* ignore */
+      }
+      this.privacyTipDismissed = true
     },
     isTakeable(order) {
       return this.canTakeOrder(order)
@@ -1579,8 +1650,58 @@ window.app = Vue.createApp({
       return this.effectiveTakeSettlement(order) || 'lightning'
     },
     orderPriceFactor(order) {
+      const FS = window.TratoFiatSats
       const p = Number(order && order.premium) || 0
-      return 1 - p / 100
+      return FS ? FS.orderPriceFactor(p) : 1 - p / 100
+    },
+    storeOrderPriceQuote(order, data) {
+      if (!order || !data) return
+      const FS = window.TratoFiatSats
+      if (!FS) return
+      const key = FS.quoteCacheKey(order)
+      this.orderPriceQuotes[key] = {
+        fiat_code: FS.normalizeFiatCode(data.fiat_code || order.fiat_code),
+        price_fiat_code: data.price_fiat_code || data.fiat_code,
+        sats_per_fiat: data.sats_per_fiat,
+        btc_price: data.btc_price
+      }
+    },
+    estimateOrderBtcSatsContext(order, opts) {
+      opts = opts || {}
+      const FS = window.TratoFiatSats
+      if (!FS) return {}
+      const onDetail = this.isDetailOpenForOrder(order)
+      return {
+        orderUsesMarketPrice: o => this.orderUsesMarketPrice(o),
+        takeFiatAmount: onDetail ? this.detailDialog.takeFiatAmount : null,
+        quoteSatsPerFiat:
+          opts.preferDetailQuote && onDetail
+            ? this.detailDialog.quoteSatsPerFiat
+            : null,
+        quoteFiatCode:
+          opts.preferDetailQuote && onDetail
+            ? FS.normalizeFiatCode(order.fiat_code)
+            : null,
+        quotePriceFiatCode:
+          opts.preferDetailQuote && onDetail
+            ? this.detailDialog.quotePriceFiatCode
+            : null,
+        orderQuotes: this.orderPriceQuotes,
+        marketPrice: this.marketPrice,
+        inRange: (o, v) => this.fiatAmountInRange(o, v)
+      }
+    },
+    estimateOrderBtcSats(order, opts) {
+      opts = opts || {}
+      const FS = window.TratoFiatSats
+      if (!FS || !order) return null
+      return FS.estimateOrderBtcSats(
+        order,
+        this.estimateOrderBtcSatsContext(order, opts)
+      )
+    },
+    tradeSatsEstimate(order) {
+      return this.estimateOrderBtcSats(order, {preferDetailQuote: false})
     },
     orderUsesMarketPrice(order) {
       if (!order) return false
@@ -1631,46 +1752,6 @@ window.app = Vue.createApp({
         return `Must be between ${order.fiat_min} and ${order.fiat_max} ${order.fiat_code}.`
       }
       return null
-    },
-    estimateOrderBtcSats(order, opts) {
-      opts = opts || {}
-      if (!order) return null
-      const fixed = Number(order.amount_sats) || 0
-      if (fixed > 0 && !this.orderUsesMarketPrice(order)) {
-        return fixed
-      }
-      let fiat = null
-      if (order.is_range) {
-        const onDetail = this.isDetailOpenForOrder(order)
-        const raw = onDetail
-          ? this.detailDialog.takeFiatAmount != null
-            ? this.detailDialog.takeFiatAmount
-            : order.fiat_min
-          : order.fiat_min
-        const v = Number(raw)
-        fiat = isNaN(v) ? null : v
-        if (fiat != null && !this.fiatAmountInRange(order, fiat)) fiat = null
-      } else if (order.fiat_amount != null && order.fiat_amount !== '') {
-        const v = Number(order.fiat_amount)
-        fiat = isNaN(v) ? null : v
-      }
-      const code = (order.fiat_code || '').trim().toUpperCase()
-      let rate = null
-      if (
-        opts.preferDetailQuote &&
-        this.detailDialog.order &&
-        this.detailDialog.order.id === order.id &&
-        this.detailDialog.quoteSatsPerFiat
-      ) {
-        rate = this.detailDialog.quoteSatsPerFiat
-      } else if (
-        this.marketPrice.fiat_code === code &&
-        this.marketPrice.sats_per_fiat
-      ) {
-        rate = this.marketPrice.sats_per_fiat
-      }
-      if (!fiat || !rate) return fixed > 0 ? fixed : null
-      return Math.round(fiat * rate * this.orderPriceFactor(order))
     },
     detailChosenFiatAmount(order) {
       if (!order) return null
@@ -1742,33 +1823,75 @@ window.app = Vue.createApp({
       }
     },
     loadDetailQuote(order) {
-      if (!order) return
-      const code = (order.fiat_code || '').trim().toUpperCase()
-      if (!code) return
-      if (!order.is_market_price && !order.is_range && order.amount_sats > 0) {
-        return
-      }
-      this.detailDialog.quoteLoading = true
-      this.detailDialog.quoteSatsPerFiat = null
-      this.detailDialog.quoteBtcPrice = null
-      LNbits.api
-        .request('GET', `/trato/api/v1/price?fiat=${encodeURIComponent(code)}`)
-        .then(res => {
+      return this.loadOrderPriceQuote(order, {
+        onStart: () => {
+          this.detailDialog.quoteLoading = true
+          this.detailDialog.quoteSatsPerFiat = null
+          this.detailDialog.quoteBtcPrice = null
+          this.detailDialog.quotePriceFiatCode = null
+        },
+        onSuccess: data => {
           if (this.detailDialog.order && this.detailDialog.order.id === order.id) {
-            this.detailDialog.quoteSatsPerFiat = res.data.sats_per_fiat
-            this.detailDialog.quoteBtcPrice = res.data.btc_price
+            this.detailDialog.quoteSatsPerFiat = data.sats_per_fiat
+            this.detailDialog.quoteBtcPrice = data.btc_price
+            this.detailDialog.quotePriceFiatCode =
+              data.price_fiat_code || data.fiat_code
           }
-        })
-        .catch(() => {
+        },
+        onFail: () => {
           if (this.detailDialog.order && this.detailDialog.order.id === order.id) {
             this.detailDialog.quoteSatsPerFiat = null
             this.detailDialog.quoteBtcPrice = null
+            this.detailDialog.quotePriceFiatCode = null
           }
-        })
-        .finally(() => {
+        },
+        onDone: () => {
           if (this.detailDialog.order && this.detailDialog.order.id === order.id) {
             this.detailDialog.quoteLoading = false
           }
+        }
+      })
+    },
+    loadOrderPriceQuote(order, hooks) {
+      hooks = hooks || {}
+      if (!order) return Promise.resolve(null)
+      const FS = window.TratoFiatSats
+      const key = FS ? FS.quoteCacheKey(order) : ''
+      const cached = key && this.orderPriceQuotes[key]
+      if (cached && cached.sats_per_fiat) {
+        if (hooks.onSuccess) hooks.onSuccess(cached)
+        if (hooks.onDone) hooks.onDone()
+        return Promise.resolve(cached)
+      }
+      const code = (order.fiat_code || '').trim().toUpperCase()
+      if (!code) {
+        if (hooks.onDone) hooks.onDone()
+        return Promise.resolve(null)
+      }
+      if (
+        !order.is_market_price &&
+        !order.is_range &&
+        Number(order.amount_sats) > 0 &&
+        order.fiat_amount == null &&
+        order.fiat_min == null
+      ) {
+        if (hooks.onDone) hooks.onDone()
+        return Promise.resolve(null)
+      }
+      if (hooks.onStart) hooks.onStart()
+      return LNbits.api
+        .request('GET', `/trato/api/v1/price?fiat=${encodeURIComponent(code)}`)
+        .then(res => {
+          this.storeOrderPriceQuote(order, res.data)
+          if (hooks.onSuccess) hooks.onSuccess(res.data)
+          return res.data
+        })
+        .catch(() => {
+          if (hooks.onFail) hooks.onFail()
+          return null
+        })
+        .finally(() => {
+          if (hooks.onDone) hooks.onDone()
         })
     },
     feeEstimateForOrder(order, userSide) {
@@ -2174,26 +2297,12 @@ window.app = Vue.createApp({
         localStorage.setItem('trato_dismiss_settings_help', '1')
       } catch (e) {}
     },
-    marketPriceFiatChain() {
-      const chain = []
-      const push = c => {
-        const code = String(c || '').trim().toUpperCase()
-        if (code && !chain.includes(code)) chain.push(code)
-      }
-      push(this.filters.fiat)
-      const h = this.health || {}
-      push(h.default_fiat_code)
-      push(h.instance_fiat_code)
-      push('USD')
-      push('EUR')
-      return chain
-    },
-    loadMarketPrice(startIdx = 0) {
-      const chain = this.marketPriceFiatChain()
-      const code = chain[startIdx]
+    loadMarketPrice() {
+      const code = this.marketFiatCode()
       if (!code) {
         this.marketPrice.sats_per_fiat = null
         this.marketPrice.btc_price = null
+        this.marketPrice.price_fiat_code = null
         this.marketPrice.loading = false
         return
       }
@@ -2202,18 +2311,16 @@ window.app = Vue.createApp({
         .request('GET', `/trato/api/v1/price?fiat=${encodeURIComponent(code)}`)
         .then(res => {
           this.marketPrice.fiat_code = res.data.fiat_code
+          this.marketPrice.price_fiat_code = res.data.price_fiat_code || res.data.fiat_code
           this.marketPrice.sats_per_fiat = res.data.sats_per_fiat
           this.marketPrice.btc_price = res.data.btc_price
           this.marketPrice.loading = false
         })
         .catch(() => {
-          if (startIdx + 1 < chain.length) {
-            this.loadMarketPrice(startIdx + 1)
-          } else {
-            this.marketPrice.sats_per_fiat = null
-            this.marketPrice.btc_price = null
-            this.marketPrice.loading = false
-          }
+          this.marketPrice.sats_per_fiat = null
+          this.marketPrice.btc_price = null
+          this.marketPrice.price_fiat_code = null
+          this.marketPrice.loading = false
         })
     },
     marketFiatCode() {
@@ -2500,15 +2607,18 @@ window.app = Vue.createApp({
         })
     },
     priceFactor() {
-      // Premium shifts the rate vs market: +% means fewer sats per fiat unit
-      // (the maker values their sats higher). Overwritable by the user.
       const p = Number(this.createDialog.data.premium) || 0
-      return 1 - p / 100
+      const FS = window.TratoFiatSats
+      return FS ? FS.orderPriceFactor(p) : 1 - p / 100
     },
     estimatedSats() {
       const d = this.createDialog
       const fa = Number(d.data.fiat_amount)
       if (!d.rate || !fa) return null
+      const FS = window.TratoFiatSats
+      if (FS) {
+        return FS.satsFromFiat(fa, d.rate, d.data.premium)
+      }
       return Math.round(fa * d.rate * this.priceFactor())
     },
     recalcFromFiat() {
@@ -3474,6 +3584,7 @@ window.app = Vue.createApp({
         return
       }
       const fiatAmount = this.detailChosenFiatAmount(order)
+      this.loadOrderPriceQuote(order).finally(() => {
       LNbits.api
         .request('POST', '/trato/api/v1/orders/take', this.adminKey, {
           order_id: order.id,
@@ -3489,16 +3600,26 @@ window.app = Vue.createApp({
           maker_identity_pubkey: order.maker_pubkey || null,
           rating: this.ratingSnapshot(order.rating),
           bonded: rep.bonded,
-          settlement_layer: settlementLayer
+          settlement_layer: settlementLayer,
+          source: order.source || null
         })
         .then(res => {
-          this.beginTradeFlow(res.data, {
+          const taken = res.data
+          const cp = this.orderPartnerMeta(taken)
+          const isLiveRs =
+            !this.settings.demo_mode &&
+            cp &&
+            String(cp.platform || '').toLowerCase() === 'robosats'
+          this.beginTradeFlow(taken, {
             message: this.settings.demo_mode
               ? 'Demo trade started — follow the steps below'
-              : 'Trade started — follow the steps below'
+              : isLiveRs
+                ? this.t('notify.robosats_bond_paid')
+                : 'Trade started — follow the steps below'
           })
         })
         .catch(err => this.notifyTratoError(err))
+      })
     },
     showOrder(order) {
       this.detailDialog.order = order
@@ -4174,6 +4295,45 @@ window.app = Vue.createApp({
         ? this.t('user_action.money_sell')
         : this.t('user_action.money_buy')
     },
+    orderPlatform(order) {
+      if (order && order.platform) {
+        return String(order.platform).toLowerCase()
+      }
+      const cp = this.orderPartnerMeta(order)
+      if (cp && cp.platform) return String(cp.platform).toLowerCase()
+      return 'mostro'
+    },
+    isRoboSatsOrder(order) {
+      return this.orderPlatform(order) === 'robosats'
+    },
+    isLiveRoboSatsOrder(order) {
+      return this.isRoboSatsOrder(order) && order && !order.demo
+    },
+    isLiveRoboSatsBookOrder(order) {
+      return (
+        String((order && order.platform) || '').toLowerCase() === 'robosats' &&
+        !this.settings.demo_mode
+      )
+    },
+    robosatsCoordinatorUrl(order) {
+      if (!order) return null
+      const src =
+        order.source ||
+        (() => {
+          try {
+            const meta = JSON.parse(order.order_json || '{}')
+            return meta.public_source || null
+          } catch (e) {
+            return null
+          }
+        })()
+      if (src && /^https?:\/\//i.test(String(src))) return String(src).trim()
+      return this.platformExternalUrl('robosats')
+    },
+    openRoboSatsCoordinator(order) {
+      const url = this.robosatsCoordinatorUrl(order)
+      if (url) window.open(url, '_blank', 'noopener,noreferrer')
+    },
     takeButtonLabel(order) {
       if (!this.platformTratoSupports(order)) {
         return this.openPlatformLabel(order.platform)
@@ -4187,6 +4347,9 @@ window.app = Vue.createApp({
         return this.t('buttons.open_platform', {platform: 'RoboSats'})
       }
       if (this.canTakeOrder(order)) {
+        if (plat === 'robosats' && !this.settings.demo_mode) {
+          return this.t('buttons.take_bond')
+        }
         return this.t('buttons.take')
       }
       if (order.is_range && this.detailFiatRangeError(order)) {
@@ -4236,6 +4399,7 @@ window.app = Vue.createApp({
       this.tradeDialog.paymentProfileOptions = []
       this.tradeDialog.shareProfileId = null
       this.tradeDialog.meetupAtLocal = ''
+      this.loadOrderPriceQuote(order)
       this.$nextTick(() => {
         this.tradeDialog.show = true
         this.loadTradeDetail()
@@ -4363,6 +4527,11 @@ window.app = Vue.createApp({
     }
   },
   created() {
+    try {
+      this.privacyTipDismissed = localStorage.getItem('trato_privacy_tip_dismissed') === '1'
+    } catch (e) {
+      this.privacyTipDismissed = false
+    }
     const SORT = typeof window !== 'undefined' ? window.TratoOrderbookSort : null
     if (SORT && SORT.readStored) {
       this.filters.sort = SORT.readStored(this.filters.sort)

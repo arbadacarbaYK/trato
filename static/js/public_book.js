@@ -12,14 +12,16 @@
   const sectionsEl = document.getElementById('pb-sections')
   const status = document.getElementById('pb-status')
   const statsEl = document.getElementById('pb-stats')
+  const dealsEl = document.getElementById('pb-deals')
   const fiatSel = document.getElementById('pb-fiat')
   const sideSel = document.getElementById('pb-side')
   const settlementSel = document.getElementById('pb-settlement')
-  const mostroCb = document.getElementById('pb-mostro')
+  const takeableCb = document.getElementById('pb-takeable')
   const sortSel = document.getElementById('pb-sort')
   const tradeLink = document.getElementById('pb-trade-link')
   const refreshBtn = document.getElementById('pb-refresh')
   const SORT = window.TratoOrderbookSort
+  const I18N = resolveLocale()
   let operatorFees = {}
   let lnUserLoggedIn = false
   let loading = false
@@ -28,6 +30,7 @@
   let loadGeneration = 0
   let cachedOrders = []
   let cachedStats = null
+  let takeablePlatforms = ['mostro', 'robosats']
 
   if (!sectionsEl || !status || !refreshBtn) {
     if (status) {
@@ -39,6 +42,176 @@
     return
   }
 
+  function resolveLocale() {
+    const catalog = window.TRATO_LOCALE || {}
+    const lang = (navigator.language || 'en').slice(0, 2).toLowerCase()
+    const pick = catalog[lang] || catalog.en || {}
+    return pick.trato || {}
+  }
+
+  function t(key, values) {
+    const parts = String(key || '').split('.')
+    let node = I18N
+    for (const part of parts) {
+      if (!node || typeof node !== 'object') {
+        node = null
+        break
+      }
+      node = node[part]
+    }
+    let text = typeof node === 'string' ? node : key
+    if (values && typeof values === 'object') {
+      Object.keys(values).forEach(k => {
+        text = text.replace(new RegExp('\\{' + k + '\\}', 'g'), String(values[k]))
+      })
+    }
+    return text
+  }
+
+  function premiumLabel(p) {
+    const n = Number(p) || 0
+    if (!n) return null
+    return (n > 0 ? '+' : '') + n + '%'
+  }
+
+  function formatEffectivePct(n) {
+    const v = Number(n) || 0
+    if (!v) return '0%'
+    const rounded = Math.round(v * 10) / 10
+    return (rounded > 0 ? '+' : '') + rounded + '%'
+  }
+
+  function feeFractionForOrder(o) {
+    const plat = String(o.platform || 'mostro').toLowerCase()
+    if (plat !== 'mostro' && plat !== 'trato') return null
+    if (operatorFees[o.mostro_pubkey]) {
+      return Number(operatorFees[o.mostro_pubkey].fee_fraction) || 0.006
+    }
+    return 0.006
+  }
+
+  function effectiveMetric(o, side) {
+    const premium = Number(o.premium) || 0
+    const frac = feeFractionForOrder(o)
+    const feeHalfPct = frac != null ? (frac * 100) / 2 : 0
+    const feesKnown = frac != null
+    const pct =
+      side === 'buy' ? premium + feeHalfPct : premium - feeHalfPct
+    return { pct, premium, feeHalfPct, feesKnown }
+  }
+
+  function dealGoodness(metric, side) {
+    return side === 'buy' ? -metric.pct : metric.pct
+  }
+
+  function dealRowLabel(o, metric) {
+    const plat = platformLabel(o.platform)
+    const prem = premiumLabel(metric.premium)
+    const premBit = prem
+      ? t('public_book.best_deals.vs_market', { premium: prem })
+      : t('public_book.best_deals.premium_only')
+    let feeBit
+    if (metric.feesKnown && metric.feeHalfPct) {
+      const pct = (Math.round(metric.feeHalfPct * 10) / 10).toFixed(1)
+      feeBit = t('public_book.best_deals.fee_est', { pct })
+    } else {
+      feeBit = t('public_book.best_deals.fees_unknown')
+    }
+    return `${plat} · ${premBit} · ${feeBit}`
+  }
+
+  function bestDealsHtml(orders, fiat, side) {
+    const candidates = filterLocal(orders).filter(o => {
+      const code = (o.fiat_code || '').toUpperCase()
+      return code === fiat && userSide(o.kind) === side
+    })
+    if (!candidates.length) return ''
+
+    const ranked = candidates
+      .map(o => ({ o, metric: effectiveMetric(o, side) }))
+      .sort((a, b) => {
+        if (side === 'buy') return a.metric.pct - b.metric.pct
+        return b.metric.pct - a.metric.pct
+      })
+      .slice(0, 8)
+
+    const goodness = ranked.map(r => dealGoodness(r.metric, side))
+    const minG = Math.min(...goodness)
+    const maxG = Math.max(...goodness)
+    const span = maxG - minG || 1
+
+    const subtitleKey =
+      side === 'buy'
+        ? 'public_book.best_deals.subtitle_buy'
+        : 'public_book.best_deals.subtitle_sell'
+    const sideClass = side === 'buy' ? 'pb-deals--buy' : 'pb-deals--sell'
+
+    const rows = ranked
+      .map((row, idx) => {
+        const g = goodness[idx]
+        const width = Math.max(8, Math.round(((g - minG) / span) * 100))
+        const score = formatEffectivePct(row.metric.pct)
+        const label = dealRowLabel(row.o, row.metric)
+        const rowSide = side === 'buy' ? 'pb-deals-row--buy' : 'pb-deals-row--sell'
+        return `<div class="pb-deals-row ${rowSide}">
+          <div class="pb-deals-row-meta">
+            <span class="pb-deals-rank">${idx + 1}</span>
+            <span class="pb-deals-label">${escapeHtml(label)}</span>
+          </div>
+          <div class="pb-deals-bar-wrap" aria-hidden="true">
+            <div class="pb-deals-bar" style="width:${width}%"></div>
+          </div>
+          <div class="pb-deals-score">${escapeHtml(
+            t('public_book.best_deals.effective', { score })
+          )}</div>
+        </div>`
+      })
+      .join('')
+
+    return `<section class="pb-deals-panel ${sideClass}" aria-labelledby="pb-deals-title">
+      <div class="pb-deals-head">
+        <h2 class="pb-deals-title" id="pb-deals-title">${escapeHtml(
+          t('public_book.best_deals.title')
+        )}</h2>
+        <p class="pb-deals-sub">${escapeHtml(
+          t(subtitleKey, { fiat })
+        )}</p>
+      </div>
+      <div class="pb-deals-chart">${rows}</div>
+      <p class="pb-deals-note">${escapeHtml(t('public_book.best_deals.note'))}</p>
+    </section>`
+  }
+
+  function renderBestDeals(orders) {
+    if (!dealsEl) return
+    const fiat = fiatSel && fiatSel.value
+    const side = sideSel && sideSel.value
+    if (!fiat || !side) {
+      dealsEl.hidden = false
+      dealsEl.innerHTML = `<section class="pb-deals-panel pb-deals-panel--hint" aria-live="polite">
+        <p class="pb-deals-hint">${escapeHtml(
+          t('public_book.best_deals.pick_filters')
+        )}</p>
+      </section>`
+      return
+    }
+    const html = bestDealsHtml(orders, fiat.toUpperCase(), side)
+    if (!html) {
+      dealsEl.hidden = true
+      dealsEl.innerHTML = ''
+      return
+    }
+    dealsEl.hidden = false
+    dealsEl.innerHTML = html
+  }
+
+  function userActionDetail(side, fiatCode) {
+    const fiat = fiatCode || 'fiat'
+    return side === 'buy'
+      ? t('user_action.buy_detail', {fiat: fiat})
+      : t('user_action.sell_detail', {fiat: fiat})
+  }
+
   function escapeHtml(s) {
     return String(s || '')
       .replace(/&/g, '&amp;')
@@ -48,8 +221,15 @@
   }
 
   function formatSats(n) {
+    if (window.TratoFiatSats && window.TratoFiatSats.formatSats) {
+      return window.TratoFiatSats.formatSats(n)
+    }
     if (n == null || isNaN(n)) return ''
-    return Number(n).toLocaleString()
+    return Math.round(Number(n)).toLocaleString('en-US', {
+      maximumFractionDigits: 0,
+      minimumFractionDigits: 0,
+      useGrouping: true
+    })
   }
 
   function userSide(makerKind) {
@@ -107,6 +287,10 @@
     }
   }
 
+  function openPlatformLabel(platform) {
+    return t('buttons.open_platform', {platform: platformLabel(platform)})
+  }
+
   function mostroTradeUrl(o) {
     const base = TRADE_URL.replace(/\/$/, '') + '/'
     const params = new URLSearchParams()
@@ -115,30 +299,44 @@
     return `${base}?${params.toString()}`
   }
 
-  function cardDestination(o) {
+  function openInPlatform(o) {
     const plat = String(o.platform || 'mostro').toLowerCase()
-    if (plat === 'mostro' || o.takeable === true) {
+
+    if (plat === 'mostro' || plat === 'trato') {
       return {
         href: mostroTradeUrl(o),
         external: false,
-        cta: lnUserLoggedIn
-          ? 'View in Trato on this server →'
-          : 'Open in Trato (LNbits login required) →'
+        label: t('public_book.open_in_trato')
       }
     }
+
+    if (plat === 'robosats') {
+      const href =
+        o.source && isHttpUrl(o.source)
+          ? o.source
+          : PLATFORM_URLS.robosats || null
+      if (!href) return null
+      return {
+        href: href,
+        external: true,
+        label: openPlatformLabel('robosats')
+      }
+    }
+
     if (o.source && isHttpUrl(o.source)) {
       return {
         href: o.source,
         external: true,
-        cta: `View on ${platformLabel(plat)} →`
+        label: openPlatformLabel(plat)
       }
     }
+
     const fallback = PLATFORM_URLS[plat]
     if (fallback) {
       return {
         href: fallback,
         external: true,
-        cta: `Trade on ${platformLabel(plat)} →`
+        label: openPlatformLabel(plat)
       }
     }
     return null
@@ -186,36 +384,60 @@
       </div>`
   }
 
+  function paymentMethodChipsHtml(pmParts) {
+    if (!pmParts.length) return ''
+    const shown = pmParts.slice(0, 3)
+    const chips = shown
+      .map(
+        pm =>
+          `<span class="pb-pm-chip"><span class="pb-pm-chip__text">${escapeHtml(pm)}</span></span>`
+      )
+      .join('')
+    const more =
+      pmParts.length > 3
+        ? `<span class="pb-pm-chip pb-pm-chip--more">+${pmParts.length - 3}</span>`
+        : ''
+    return `<div class="pb-pm-row">${chips}${more}</div>`
+  }
+
   function cardHtml(o) {
     const side = userSide(o.kind)
     const sideClass = side === 'buy' ? 'pb-card--buy' : 'pb-card--sell'
-    const chipClass = side === 'buy' ? 'pb-chip-buy' : 'pb-chip-sell'
-    const action = side === 'buy' ? 'Buy BTC' : 'Sell BTC'
+    const chipSideClass = side === 'buy' ? 'pb-chip-side--buy' : 'pb-chip-side--sell'
+    const btnClass = side === 'buy' ? 'pb-card-btn--buy' : 'pb-card-btn--sell'
+    const action = side === 'buy' ? t('user_action.buy') : t('user_action.sell')
     const plat = (o.platform || 'mostro').toLowerCase()
     const amount = o.is_market_price
-      ? 'market price'
+      ? t('market.market_price')
       : `${formatSats(o.amount_sats)} sats`
+    const premium = premiumLabel(o.premium)
     const pmParts = expandPaymentMethods(o.payment_methods)
-    const pmShown = pmParts.slice(0, 4).join(', ')
-    const pmMore = pmParts.length > 4 ? ` +${pmParts.length - 4}` : ''
-    const pmTitle = pmParts.length
-      ? ` title="${escapeHtml(pmParts.join(' · '))}"`
-      : ''
-    const dest = cardDestination(o)
-    const tag = dest ? 'a' : 'article'
-    const href = dest ? ` href="${escapeHtml(dest.href)}"` : ''
-    const rel = dest && dest.external ? ' rel="noopener noreferrer" target="_blank"' : ''
-    const inner = `<div class="pb-card-top">
-        <span class="pb-chip ${chipClass}">${escapeHtml(action)}</span>
-        <span class="pb-chip pb-chip-plat">${escapeHtml(plat)}</span>
-      </div>
-      <h2 class="pb-card-amount">${escapeHtml(o.fiat_display || o.fiat_code)}</h2>
-      <div class="pb-meta">${escapeHtml(amount)}</div>
-      <div class="pb-meta pb-meta-pm"${pmTitle}>${pmParts.length ? escapeHtml(pmShown + pmMore) : '—'}</div>
-      ${avatarBlockHtml(o)}
-      ${dest ? `<div class="pb-card-cta">${escapeHtml(dest.cta)}</div>` : ''}`
+    const dest = openInPlatform(o)
+    const premiumBit = premium ? ` · ${premium} vs market` : ''
+    const btnRel = dest && dest.external ? ' rel="noopener noreferrer" target="_blank"' : ''
 
-    return `<${tag} class="pb-card ${sideClass}"${href}${rel}>${inner}</${tag}>`
+    return `<article class="pb-card trato-order-card ${sideClass}">
+      <div class="pb-card-section pb-card-section--head">
+        <div class="pb-card-top">
+          <span class="pb-chip pb-chip-side ${chipSideClass}">${escapeHtml(action)}</span>
+          <span class="pb-chip pb-chip-plat">${escapeHtml(platformLabel(plat))}</span>
+        </div>
+        <div class="pb-card-action-detail">${escapeHtml(userActionDetail(side, o.fiat_code))}</div>
+      </div>
+      <div class="pb-card-section">
+        <h2 class="pb-card-amount">${escapeHtml(o.fiat_display || o.fiat_code)}</h2>
+        <div class="pb-meta pb-meta-amount">${escapeHtml(amount + premiumBit)}</div>
+      </div>
+      ${avatarBlockHtml(o)}
+      ${paymentMethodChipsHtml(pmParts)}
+      ${
+        dest
+          ? `<div class="pb-card-actions">
+        <a class="pb-card-btn ${btnClass}" href="${escapeHtml(dest.href)}"${btnRel}>${escapeHtml(dest.label)}</a>
+      </div>`
+          : ''
+      }
+    </article>`
   }
 
   const SECTIONS = [
@@ -352,12 +574,33 @@
     if (prev) fiatSel.value = prev
   }
 
+  function isTakeableOrder(o) {
+    if (!o) return false
+    if (o.takeable === true) return true
+    if (o.takeable === false) return false
+    const plat = String(o.platform || 'mostro').toLowerCase()
+    return takeablePlatforms.includes(plat)
+  }
+
   function filterLocal(orders) {
     let list = orders
-    if (mostroCb && mostroCb.checked) {
-      list = list.filter(o => (o.platform || '').toLowerCase() === 'mostro')
+    if (takeableCb && takeableCb.checked) {
+      list = list.filter(isTakeableOrder)
     }
     return list
+  }
+
+  function applyTakeablePlatforms(stats) {
+    if (stats && Array.isArray(stats.takeable_platforms) && stats.takeable_platforms.length) {
+      takeablePlatforms = stats.takeable_platforms.map(p => String(p).toLowerCase())
+    }
+  }
+
+  function initFilterUi() {
+    const textEl = document.getElementById('pb-takeable-text')
+    const labelEl = document.getElementById('pb-takeable-label')
+    if (textEl) textEl.textContent = t('public_book.filter_take_in_trato')
+    if (labelEl) labelEl.title = t('tooltips.toggle_trato_only')
   }
 
   function setRefreshUi(active) {
@@ -388,9 +631,8 @@
 
   function emptyMessage(stats, orders) {
     let msg = 'No offers match your filters.'
-    if (mostroCb && mostroCb.checked && (stats.total || 0) > 0) {
-      msg +=
-        ' Uncheck “Mostro only” to see RoboSats, Peach, and other platforms on the relays.'
+    if (takeableCb && takeableCb.checked && (stats.total || 0) > 0) {
+      msg += t('public_book.uncheck_takeable')
     } else if (stats.last_error) {
       msg =
         `Relay sync failed: ${stats.last_error}. ` +
@@ -409,6 +651,7 @@
     cachedOrders = orders
     if (stats) cachedStats = stats
     const visible = filterLocal(orders)
+    renderBestDeals(orders)
     if (cachedStats) updateStatsLine(cachedStats, orders)
     if (!visible.length) {
       status.hidden = false
@@ -464,6 +707,7 @@
       fetchJson(`${API}/orderbook/stats`)
         .then(stats => {
           if (gen !== loadGeneration) return
+          applyTakeablePlatforms(stats)
           populateFiat(stats, cachedOrders.length ? cachedOrders : orders)
           paintOrders(cachedOrders.length ? cachedOrders : orders, stats)
         })
@@ -487,7 +731,8 @@
   ;[sideSel, fiatSel, settlementSel].forEach(el => {
     if (el) el.addEventListener('change', load)
   })
-  if (mostroCb) mostroCb.addEventListener('change', repaintLocal)
+  initFilterUi()
+  if (takeableCb) takeableCb.addEventListener('change', repaintLocal)
   if (sortSel) {
     if (SORT && SORT.readStored) {
       sortSel.value = SORT.readStored(sortSel.value)

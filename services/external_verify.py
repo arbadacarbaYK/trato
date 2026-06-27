@@ -18,7 +18,7 @@ async def verify_external_order(order: PublicOrder) -> bool:
         return False
     if plat == "robosats":
         return await federation.verify_public_order(
-            order.mostro_pubkey, order.id
+            order.mostro_pubkey, order.id, source=order.source
         )
     return False
 
