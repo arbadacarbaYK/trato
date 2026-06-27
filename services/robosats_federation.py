@@ -44,7 +44,8 @@ class RoboSatsFederation:
         return self.is_coordinator_pubkey(pubkey_hex)
 
     def coordinator_url(self, pubkey_hex: str) -> str | None:
-        return self._by_pubkey.get((pubkey_hex or "").lower())
+        url = self._by_pubkey.get((pubkey_hex or "").lower())
+        return url or None
 
     def coordinator_url_for_alias(self, alias: str) -> str | None:
         return self._by_alias.get((alias or "").strip().lower())
@@ -54,6 +55,9 @@ class RoboSatsFederation:
         if not meta:
             return None
         return str(meta.get("nostrHexPubkey") or "").lower() or None
+
+    def coordinator_pubkeys(self) -> list[str]:
+        return list(self._by_pubkey.keys())
 
     async def ensure_loaded(self) -> None:
         now = time.time()
@@ -81,10 +85,14 @@ class RoboSatsFederation:
             mainnet = entry.get("mainnet") or {}
             base = str(mainnet.get("clearnet") or "").strip().rstrip("/")
             short = str(entry.get("shortAlias") or alias).strip().lower()
-            if pk and base:
-                by_pk[pk] = base
-                by_alias[short] = base
-                meta[short] = entry
+            if pk:
+                if base:
+                    by_pk[pk] = base
+                elif pk not in by_pk:
+                    by_pk[pk] = ""
+                if base:
+                    by_alias[short] = base
+                    meta[short] = entry
         if by_pk:
             self._by_pubkey = by_pk
             self._by_alias = by_alias

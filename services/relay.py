@@ -46,6 +46,7 @@ ORDER_TTL_SECONDS = 15 * 60
 # ``since(last_sync)`` starves quiet makers (e.g. Mostro) that do not republish
 # every few minutes; their ``seen_at`` would age out under ORDER_TTL_SECONDS.
 ORDER_FETCH_LOOKBACK_SECONDS = 86400
+ROBOSATS_COORDINATOR_LOOKBACK_SECONDS = 30 * 86400
 DELETION_LOOKBACK_SECONDS = 2 * POLL_INTERVAL_SECONDS
 
 # Back-compat: tests import platform_supported from relay.
@@ -306,6 +307,32 @@ class OrderbookService:
             return
         self._verify_task = asyncio.create_task(self._verify_external_book())
 
+    def _ingest_order_events(self, vec, seen_at: int) -> int:
+        parsed = 0
+        for ev in vec:
+            try:
+                order = parse_order_event(ev)
+            except ValueError:
+                continue
+            except Exception as exc:  # noqa: BLE001
+                logger.debug(f"trato: order parse error: {exc!r}")
+                continue
+            plat = (order.platform or "mostro").strip().lower()
+            if plat == "robosats" and not federation.passes_ingest_filter(
+                order.mostro_pubkey
+            ):
+                continue
+            key = self._key(order)
+            existing = self._orders.get(key)
+            if existing and (existing[0].event_created_at or 0) >= (
+                order.event_created_at or 0
+            ):
+                self._store_order(existing[0], seen_at)
+            else:
+                self._store_order(order, seen_at)
+            parsed += 1
+        return parsed
+
     async def poll_once(self) -> int:
         """Fetch + merge one cycle. Returns number of parsed orders."""
         if not self._relays:
@@ -347,28 +374,32 @@ class OrderbookService:
             self.raw_seen = len(vec)
             seen_at = int(time.time())
             await federation.ensure_loaded()
-            for ev in vec:
-                try:
-                    order = parse_order_event(ev)
-                except ValueError:
-                    continue
-                except Exception as exc:  # noqa: BLE001
-                    logger.debug(f"trato: order parse error: {exc!r}")
-                    continue
-                plat = (order.platform or "mostro").strip().lower()
-                if plat == "robosats" and not federation.passes_ingest_filter(
-                    order.mostro_pubkey
-                ):
-                    continue
-                key = self._key(order)
-                existing = self._orders.get(key)
-                if existing and (existing[0].event_created_at or 0) >= (
-                    order.event_created_at or 0
-                ):
-                    self._store_order(existing[0], seen_at)
-                else:
-                    self._store_order(order, seen_at)
-                parsed += 1
+            parsed = self._ingest_order_events(vec, seen_at)
+
+            if federation.index_loaded:
+                from nostr_sdk import PublicKey
+
+                authors = []
+                for pk_hex in federation.coordinator_pubkeys():
+                    try:
+                        authors.append(PublicKey.parse(pk_hex))
+                    except Exception:  # noqa: BLE001
+                        continue
+                if authors:
+                    rs_since = Timestamp.from_secs(
+                        max(0, now_secs - ROBOSATS_COORDINATOR_LOOKBACK_SECONDS)
+                    )
+                    f_rs = (
+                        Filter()
+                        .kind(Kind(KIND_ORDER))
+                        .authors(authors)
+                        .limit(500)
+                        .since(rs_since)
+                    )
+                    rs_events = await client.fetch_events(
+                        f_rs, timedelta(seconds=FETCH_TIMEOUT_SECONDS)
+                    )
+                    parsed += self._ingest_order_events(rs_events.to_vec(), seen_at)
 
             f_del = Filter().kind(Kind(KIND_DELETE)).limit(500).since(deletion_since_ts)
             del_events = await client.fetch_events(

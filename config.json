@@ -3,7 +3,7 @@
   "short_description": "P2P Bitcoin & fiat on Nostr — live Mostro escrow with LND; demo mode for practice.",
   "tile": "/trato/static/image/trato.png",
   "contributors": ["arbadacarba"],
-  "version": "0.2.10",
+  "version": "0.2.12",
   "min_lnbits_version": "1.0.0",
   "payment_hash": ""
 }
