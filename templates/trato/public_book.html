@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="Live P2P Bitcoin ↔ fiat offers from the open Nostr network. Browse only — no account." />
+    <title>Trato — public order book</title>
+    <link rel="icon" type="image/png" href="{{ static_url_for('trato/static', 'image/favicon-32.png') }}" />
+    <link rel="apple-touch-icon" href="{{ static_url_for('trato/static', 'image/trato-192.png') }}" />
+    <link rel="stylesheet" href="{{ static_url_for('trato/static', 'css/public_book.css') }}" />
+  </head>
+  <body>
+    <div class="pb-wrap">
+      <header class="pb-header">
+        <div class="pb-brand">
+          <img
+            class="pb-logo"
+            src="{{ static_url_for('trato/static', 'image/trato.png') }}"
+            width="52"
+            height="52"
+            alt=""
+          />
+          <div>
+            <h1 class="pb-title">Trato</h1>
+            <p class="pb-sub">Live P2P Bitcoin ↔ fiat · open network</p>
+          </div>
+        </div>
+        <div class="pb-header-actions">
+          <a href="{{ trade_url }}" class="pb-btn pb-btn--primary" id="pb-trade-link" hidden>
+            Trade here →
+          </a>
+          <button type="button" class="pb-btn" id="pb-refresh">Refresh</button>
+        </div>
+      </header>
+
+      <details class="pb-about">
+        <summary>Browse only · how this page works</summary>
+        <div class="pb-about-body">
+          <p>
+            <strong>No account needed</strong> — share this link freely (clearnet or Tor).
+          </p>
+          <p>
+            Trato is a <strong>client</strong> for live ads on the decentralized Nostr
+            network. We do not run the market, hold funds, or perform KYC — each offer
+            comes from independent peers and their operator.
+          </p>
+          <p>
+            To <strong>take</strong> an offer, open
+            <a href="{{ trade_url }}">Trato in LNbits</a> on this server or any other
+            LNbits instance that runs Trato.
+          </p>
+        </div>
+      </details>
+
+      <div class="pb-toolbar">
+        <div class="pb-field">
+          <label for="pb-side">I want to</label>
+          <select id="pb-side">
+            <option value="">All sides</option>
+            <option value="buy">Buy BTC</option>
+            <option value="sell">Sell BTC</option>
+          </select>
+        </div>
+        <div class="pb-field">
+          <label for="pb-fiat">Currency</label>
+          <select id="pb-fiat">
+            <option value="">All currencies</option>
+          </select>
+        </div>
+        <div class="pb-field">
+          <select id="pb-settlement" aria-label="Settlement">
+            <option value="">Any settlement</option>
+            <option value="lightning">Lightning</option>
+            <option value="onchain">On-chain</option>
+          </select>
+        </div>
+        <div class="pb-field pb-field--sort">
+          <label for="pb-sort">Sort by</label>
+          <select id="pb-sort" aria-label="Sort offers">
+            <option value="newest">Newest first</option>
+            <option value="oldest">Oldest first</option>
+            <option value="amount_desc">Amount (BTC) — high to low</option>
+            <option value="amount_asc">Amount (BTC) — low to high</option>
+            <option value="fiat_desc">Fiat range — high to low</option>
+            <option value="fiat_asc">Fiat range — low to high</option>
+            <option value="market_asc">Market (currency) A–Z</option>
+            <option value="premium_asc">Premium — lowest first</option>
+            <option value="premium_desc">Premium — highest first</option>
+            <option value="platform_asc">Platform A–Z</option>
+            <option value="takeable_first">Take in Trato first</option>
+          </select>
+        </div>
+        <label class="pb-check">
+          <input type="checkbox" id="pb-mostro" />
+          Mostro only (take in Trato)
+        </label>
+      </div>
+
+      <div class="pb-stats" id="pb-stats"></div>
+      <div id="pb-status" class="pb-loading">Loading live offers…</div>
+      <div id="pb-sections" hidden></div>
+    </div>
+    <script>
+      window.TRATO_PUBLIC_BOOK = {
+        tradeUrl: {{ trade_url | tojson }},
+        iconUrl: {{ static_url_for('trato/static', 'image/trato.png') | tojson }},
+        platformUrls: {
+          robosats: 'https://learn.robosats.org/',
+          peach: 'https://peachbitcoin.com/',
+          lnp2pbot: 'https://lnp2pbot.com/',
+          hodlhodl: 'https://hodlhodl.com/'
+        }
+      };
+    </script>
+    <script src="{{ static_url_for('trato/static', 'js/avatar.js') }}"></script>
+    <script src="{{ static_url_for('trato/static', 'js/orderbook_sort.js') }}"></script>
+    <script src="{{ static_url_for('trato/static', 'js/public_book.js') }}"></script>
+  </body>
+</html>

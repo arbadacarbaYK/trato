@@ -1,0 +1,1056 @@
+/* Trato extension styling. Restrained, calm, premium.
+   References Quasar tokens where possible; only structural extras here. */
+
+.trato-page {
+  width: 100%;
+  max-width: none;
+  margin: 0;
+}
+
+.trato-app-header {
+  margin-bottom: 12px;
+}
+
+.trato-header-nav {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px 8px;
+  flex-wrap: wrap;
+}
+
+.trato-header-nav .trato-tabs {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin-bottom: 0;
+}
+
+.trato-header-actions {
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+}
+
+@media (min-width: 1024px) {
+  .trato-app-header {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+
+  .trato-app-header .trato-header {
+    margin-bottom: 0 !important;
+    flex: none;
+    min-width: 0;
+  }
+
+  .trato-app-header .trato-header-nav {
+    flex: none;
+    width: 100%;
+    justify-content: space-between;
+    min-width: 0;
+  }
+
+  .trato-app-header + .q-separator {
+    margin-bottom: 12px;
+  }
+}
+
+.trato-wordmark {
+  letter-spacing: -0.02em;
+}
+
+.trato-logo {
+  border-radius: 10px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.25);
+  flex-shrink: 0;
+}
+
+.trato-tabs {
+  margin-bottom: 2px;
+}
+
+.trato-panels {
+  background: transparent;
+}
+
+/* Order cards: gentle lift, generous breathing room, quiet borders. */
+.trato-fee-breakdown {
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+  padding-top: 12px;
+}
+
+.trato-fee-row + .trato-fee-row {
+  border-top: 1px solid rgba(0, 0, 0, 0.05);
+  padding-top: 8px;
+}
+
+.trato-fee-row__main {
+  min-height: 1.75rem;
+}
+
+.trato-fee-details {
+  opacity: 0.92;
+}
+
+.trato-fee-details .trato-fee-row + .trato-fee-row {
+  border-top: 1px solid rgba(0, 0, 0, 0.04);
+  padding-top: 6px;
+  margin-top: 4px;
+}
+
+.trato-fee-summary {
+  border-radius: 12px;
+  padding: 14px 16px;
+  border: 2px solid rgba(0, 0, 0, 0.1);
+  background: rgba(0, 0, 0, 0.03);
+}
+
+.trato-fee-summary--buy {
+  border-color: rgba(46, 125, 50, 0.45);
+  background: rgba(46, 125, 50, 0.08);
+}
+
+.trato-fee-summary--sell {
+  border-color: rgba(198, 40, 40, 0.4);
+  background: rgba(198, 40, 40, 0.07);
+}
+
+.trato-fee-summary__title {
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  margin-bottom: 10px;
+  opacity: 0.85;
+}
+
+.trato-fee-summary__row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 4px 12px;
+  align-items: baseline;
+  padding: 6px 0;
+}
+
+.trato-fee-summary__row + .trato-fee-summary__row {
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.trato-fee-summary__row--fee {
+  background: rgba(0, 0, 0, 0.04);
+  margin: 0 -8px;
+  padding: 8px 8px;
+  border-radius: 8px;
+  border-top: none;
+}
+
+.trato-fee-summary__row--premium {
+  background: rgba(255, 152, 0, 0.1);
+  margin: 0 -8px;
+  padding: 8px 8px;
+  border-radius: 8px;
+  border-top: none;
+}
+
+.trato-fee-summary__row--premium + .trato-fee-summary__row--fee {
+  margin-top: 6px;
+}
+
+.trato-fee-summary__row--premium .trato-fee-summary__value {
+  color: #e65100;
+  font-weight: 800;
+}
+
+.trato-fee-summary__row--fee + .trato-fee-summary__row--total {
+  border-top: none;
+  margin-top: 8px;
+}
+
+.trato-fee-summary__row--total {
+  grid-template-columns: 1fr;
+  padding-top: 10px;
+  margin-top: 4px;
+  border-top: 2px solid rgba(0, 0, 0, 0.12) !important;
+}
+
+.trato-fee-summary__label {
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.trato-fee-summary__value {
+  font-size: 0.95rem;
+  font-weight: 700;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.trato-fee-summary__value--total {
+  font-size: 1.35rem;
+  font-weight: 800;
+  text-align: left;
+  line-height: 1.25;
+  letter-spacing: -0.02em;
+}
+
+.trato-fee-summary__row--total .trato-fee-summary__label {
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+.trato-fee-summary__detail {
+  grid-column: 1 / -1;
+  font-size: 0.75rem;
+  opacity: 0.78;
+  line-height: 1.35;
+}
+
+/* Compact trade dialog — summary first, details collapsed */
+.trato-trade-header .text-h6 {
+  font-size: 1.15rem;
+  line-height: 1.25;
+}
+
+.trato-trade-demo-chip {
+  margin: 0;
+}
+
+.trato-fee-breakdown--compact {
+  border-top: none;
+  padding-top: 0;
+}
+
+.trato-fee-summary--compact {
+  padding: 10px 12px;
+  border-width: 1px;
+}
+
+.trato-fee-summary--compact .trato-fee-summary__title {
+  margin-bottom: 6px;
+  font-size: 0.72rem;
+}
+
+.trato-fee-summary--compact .trato-fee-summary__row {
+  padding: 4px 0;
+}
+
+.trato-fee-expand {
+  border-radius: 8px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  margin-top: 8px;
+}
+
+.trato-fee-expand__header {
+  min-height: 40px;
+}
+
+.trato-fee-row--compact + .trato-fee-row--compact {
+  border-top: 1px solid rgba(0, 0, 0, 0.05);
+  padding-top: 4px;
+  margin-top: 2px;
+}
+
+.trato-fee-row__main--compact {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 6px 8px;
+  align-items: center;
+  min-height: 1.5rem;
+  font-size: 0.75rem;
+}
+
+.trato-fee-row__label {
+  min-width: 0;
+}
+
+.trato-fee-row__value {
+  font-weight: 600;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.trato-demo-expand .q-item {
+  min-height: 44px;
+}
+
+body.body--dark .trato-fee-expand {
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+.trato-fee-summary--buy .trato-fee-summary__value--total {
+  color: #2e7d32;
+}
+
+.trato-fee-summary--sell .trato-fee-summary__value--total {
+  color: #c62828;
+}
+
+.trato-order-card-col {
+  min-width: 0;
+}
+
+/* Fill available width; card width stays readable (280–400px). */
+.trato-order-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr));
+  gap: 12px 16px;
+  width: 100%;
+  align-items: stretch;
+}
+
+
+.trato-order-card {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  border-radius: 14px;
+  overflow: hidden;
+  max-width: 100%;
+  min-width: 0;
+  transition:
+    transform 0.12s ease,
+    box-shadow 0.12s ease;
+}
+
+/* Keep Take / Open Peach / info pinned to the card footer (variable PM tag height). */
+.trato-order-card > .q-card__actions {
+  margin-top: auto;
+  flex-shrink: 0;
+  padding-top: 8px;
+}
+
+.trato-pm-section {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.trato-pm-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  max-width: 100%;
+  min-width: 0;
+}
+
+/* Payment method tags — readable at a glance on light and dark LNbits themes. */
+.trato-pm-chip.q-chip {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: 0.01em;
+  height: auto;
+  min-height: 28px;
+  padding: 5px 10px;
+  border-radius: 7px;
+  max-width: 100%;
+  min-width: 0;
+  background: rgba(230, 81, 0, 0.1);
+  color: #bf360c;
+  border: 1px solid rgba(230, 81, 0, 0.38);
+  box-shadow: none;
+}
+
+.trato-pm-chip.q-chip .q-chip__content {
+  min-width: 0;
+  max-width: 100%;
+  padding: 0;
+  color: inherit;
+}
+
+.trato-pm-chip__text {
+  display: block;
+  max-width: 12rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.trato-pm-chip--more.q-chip {
+  background: rgba(0, 0, 0, 0.06);
+  color: rgba(0, 0, 0, 0.72);
+  border-color: rgba(0, 0, 0, 0.18);
+  font-weight: 700;
+}
+
+.trato-pm-match {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  line-height: 1.4;
+  color: #00695c;
+}
+
+body.body--dark .trato-pm-chip.q-chip {
+  background: rgba(255, 167, 38, 0.22);
+  color: #ffe0b2;
+  border-color: rgba(255, 183, 77, 0.55);
+}
+
+body.body--dark .trato-pm-chip--more.q-chip {
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.88);
+  border-color: rgba(255, 255, 255, 0.28);
+}
+
+body.body--dark .trato-pm-match {
+  color: #80cbc4;
+}
+
+.trato-pm-chip__text--detail {
+  max-width: 14rem;
+  white-space: normal;
+  word-break: break-word;
+  overflow: visible;
+  text-overflow: unset;
+}
+
+.ellipsis-2-lines {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  line-height: 1.35;
+}
+
+.trato-order-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.12);
+}
+
+.trato-order-card--active {
+  border-color: var(--q-primary);
+  box-shadow: 0 0 0 1px var(--q-primary);
+}
+
+.trato-dialog {
+  width: 100%;
+  max-width: 92vw;
+  border-radius: 14px;
+}
+
+@media (min-width: 600px) {
+  .trato-dialog {
+    max-width: 520px;
+  }
+}
+
+.trato-dialog--trade {
+  max-width: 92vw;
+}
+
+.trato-dispute-banner {
+  border-radius: 10px;
+}
+
+.trato-trade-actions {
+  flex-wrap: wrap;
+}
+
+.trato-trade-actions .q-btn {
+  min-height: 44px;
+}
+
+@media (max-width: 599px) {
+  .trato-trade-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .trato-trade-actions .q-btn {
+    width: 100%;
+    margin-left: 0 !important;
+  }
+
+  .trato-trade-actions .q-space {
+    display: none;
+  }
+
+  .trato-dialog--trade .q-card-section {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+}
+
+@media (min-width: 600px) {
+  .trato-dialog--trade {
+    max-width: 600px;
+  }
+}
+
+@media (min-width: 1200px) {
+  .trato-dialog--trade {
+    max-width: 720px;
+  }
+}
+
+/* Inset panels inside dialogs — never use Quasar bg-grey-1 on dark theme (white
+   box + inherited light text = unreadable). */
+.trato-panel {
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+body.body--light .trato-panel {
+  background: #f4f6f8;
+  color: #263238;
+}
+
+body.body--dark .trato-panel {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.92);
+}
+
+body.body--light .trato-panel .text-body2,
+body.body--light .trato-panel .text-subtitle2,
+body.body--light .trato-panel strong {
+  color: #263238;
+}
+
+body.body--dark .trato-panel .text-body2,
+body.body--dark .trato-panel .text-subtitle2,
+body.body--dark .trato-panel strong {
+  color: rgba(255, 255, 255, 0.92);
+}
+
+body.body--light .trato-panel .text-grey,
+body.body--light .trato-panel .text-caption.text-grey,
+body.body--light .trato-panel .text-grey-6,
+body.body--light .trato-panel .text-grey-7,
+body.body--light .trato-panel .text-grey-8 {
+  color: #546e7a !important;
+}
+
+body.body--dark .trato-panel .text-grey,
+body.body--dark .trato-panel .text-caption.text-grey,
+body.body--dark .trato-panel .text-grey-6,
+body.body--dark .trato-panel .text-grey-7,
+body.body--dark .trato-panel .text-grey-8,
+body.body--dark .trato-panel .text-grey-9 {
+  color: rgba(255, 255, 255, 0.72) !important;
+}
+
+body.body--light .trato-panel--accent-green {
+  background: #e8f5e9;
+  border-left: 3px solid #43a047;
+}
+
+body.body--dark .trato-panel--accent-green {
+  background: rgba(76, 175, 80, 0.12);
+  border-left: 3px solid #66bb6a;
+}
+
+body.body--light .trato-panel--accent-amber {
+  background: #fff8e1;
+  border-left: 3px solid #ffa000;
+}
+
+body.body--dark .trato-panel--accent-amber {
+  background: rgba(255, 193, 7, 0.1);
+  border-left: 3px solid #ffca28;
+}
+
+body.body--light .trato-panel--accent-blue {
+  background: #eceff1;
+  border-left: 3px solid #546e7a;
+}
+
+body.body--dark .trato-panel--accent-blue {
+  background: rgba(96, 125, 139, 0.15);
+  border-left: 3px solid #90a4ae;
+}
+
+body.body--dark .trato-trust-panel .text-grey-6,
+body.body--dark .trato-trust-panel .text-grey-8 {
+  color: rgba(255, 255, 255, 0.72) !important;
+}
+
+body.body--dark .trato-fee-breakdown {
+  border-top-color: rgba(255, 255, 255, 0.12);
+}
+
+body.body--dark .trato-fee-row + .trato-fee-row {
+  border-top-color: rgba(255, 255, 255, 0.08);
+}
+
+body.body--dark .trato-fee-details .trato-fee-row + .trato-fee-row {
+  border-top-color: rgba(255, 255, 255, 0.06);
+}
+
+body.body--dark .trato-fee-summary {
+  border-color: rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+body.body--dark .trato-fee-summary--buy {
+  border-color: rgba(129, 199, 132, 0.5);
+  background: rgba(46, 125, 50, 0.18);
+}
+
+body.body--dark .trato-fee-summary--sell {
+  border-color: rgba(239, 154, 154, 0.45);
+  background: rgba(198, 40, 40, 0.16);
+}
+
+body.body--dark .trato-fee-summary__row + .trato-fee-summary__row {
+  border-top-color: rgba(255, 255, 255, 0.1);
+}
+
+body.body--dark .trato-fee-summary__row--fee {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+body.body--dark .trato-fee-summary__row--premium {
+  background: rgba(255, 183, 77, 0.14);
+}
+
+body.body--dark .trato-fee-summary__row--premium .trato-fee-summary__value {
+  color: #ffb74d;
+}
+
+body.body--dark .trato-fee-summary__row--total {
+  border-top-color: rgba(255, 255, 255, 0.2) !important;
+}
+
+body.body--dark .trato-fee-summary--buy .trato-fee-summary__value--total {
+  color: #81c784;
+}
+
+body.body--dark .trato-fee-summary--sell .trato-fee-summary__value--total {
+  color: #ef9a9a;
+}
+
+body.body--dark .trato-dialog .trato-fee-breakdown .text-body2,
+body.body--dark .trato-dialog .trato-fee-breakdown .text-subtitle2 {
+  color: rgba(255, 255, 255, 0.92);
+}
+
+body.body--dark .trato-dialog .trato-fee-breakdown .text-grey {
+  color: rgba(255, 255, 255, 0.72) !important;
+}
+
+.trato-avatar-img img {
+  object-fit: cover;
+}
+
+.trato-avatar-link {
+  cursor: pointer;
+}
+
+.trato-avatar-link:hover {
+  opacity: 0.88;
+}
+
+.q-avatar img {
+  object-fit: cover;
+}
+
+/* Trade timeline: a calm, scrollable activity feed. */
+.trato-timeline {
+  max-height: 280px;
+  overflow-y: auto;
+}
+
+.trato-timeline-system {
+  text-align: center;
+  margin: 10px 0;
+  padding: 0 12px;
+}
+
+.trato-timeline-system__text {
+  display: inline-block;
+  max-width: 92%;
+  padding: 6px 12px;
+  border-radius: 10px;
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+
+body.body--light .trato-timeline-system__text {
+  color: #455a64;
+  background: rgba(0, 0, 0, 0.06);
+}
+
+body.body--dark .trato-timeline-system__text {
+  color: rgba(255, 255, 255, 0.75);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.trato-timeline-system__stamp {
+  margin-top: 4px;
+  font-size: 0.68rem;
+}
+
+body.body--light .trato-timeline-system__stamp {
+  color: #78909c;
+}
+
+body.body--dark .trato-timeline-system__stamp {
+  color: rgba(255, 255, 255, 0.45);
+}
+
+/* Hints and trust copy — readable in LNbits light and dark themes. */
+.trato-hint-banner,
+.trato-trust-legend,
+.trato-book-empty-banner {
+  border-radius: 10px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+body.body--light .trato-hint-banner,
+body.body--light .trato-trust-legend,
+body.body--light .trato-book-empty-banner {
+  background: #f4f6f8;
+  color: #37474f;
+}
+
+body.body--dark .trato-hint-banner,
+body.body--dark .trato-trust-legend,
+body.body--dark .trato-book-empty-banner {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.14);
+  color: rgba(255, 255, 255, 0.9);
+}
+
+body.body--dark .trato-hint-banner .text-caption,
+body.body--dark .trato-trust-legend .text-caption,
+body.body--dark .trato-book-empty-banner .text-caption {
+  color: rgba(255, 255, 255, 0.72);
+}
+
+/* Order book info banner — avoid Quasar bg-blue-1 (bright box in dark mode). */
+.trato-book-info-banner {
+  border-radius: 10px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+body.body--light .trato-book-info-banner {
+  background: #eceff1;
+  border-left: 3px solid #546e7a;
+  color: #37474f;
+}
+
+body.body--dark .trato-book-info-banner {
+  background: rgba(96, 125, 139, 0.15);
+  border-color: rgba(255, 255, 255, 0.14);
+  border-left: 3px solid #90a4ae;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+body.body--dark .trato-book-info-banner strong {
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.trato-filter-meta {
+  opacity: 0.85;
+}
+
+.trato-book-filters {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+  align-items: stretch;
+}
+
+@media (min-width: 600px) {
+  .trato-book-filters {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px 10px;
+  }
+}
+
+@media (min-width: 960px) {
+  .trato-book-filters {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+}
+
+.trato-book-filters .q-field {
+  min-width: 0;
+  width: 100%;
+}
+
+/* Same control height for all filter selects (currency was taller than the rest). */
+.trato-book-filters .q-field--dense .q-field__control {
+  min-height: 40px;
+}
+
+.trato-book-filters .q-field--dense.q-field--labeled .q-field__control {
+  min-height: 40px;
+}
+
+.trato-book-filters .q-field--dense .q-field__marginal {
+  height: 40px;
+}
+
+.trato-book-filters .q-field--dense .q-field__control-container {
+  min-height: 40px;
+  padding-top: 0;
+}
+
+.trato-book-filters .q-field__native,
+.trato-book-filters .q-field__input {
+  font-size: 0.8125rem;
+  min-height: 24px;
+  max-width: 100%;
+}
+
+.trato-book-filters .q-field__input {
+  min-width: 0;
+}
+
+.trato-book-filters__payment .q-field__control {
+  min-width: 0;
+}
+
+.trato-book-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px 12px;
+}
+
+.trato-book-toolbar__main {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 14px;
+  flex: 1 1 280px;
+  min-width: 0;
+}
+
+.trato-book-toggles {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: 12px;
+  row-gap: 2px;
+}
+
+.trato-book-toggles .q-toggle {
+  margin: 0;
+}
+
+.trato-book-toggles .q-toggle__label {
+  font-size: 12px;
+  line-height: 1.25;
+}
+
+.trato-book-toolbar__meta {
+  flex: 1 1 160px;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.trato-book-toolbar__price {
+  flex: 0 0 auto;
+  margin-left: auto;
+}
+
+.trato-book-filter-hint {
+  margin-top: -4px;
+}
+
+body.body--dark .trato-filter-meta {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.trato-hint-expand {
+  border-radius: 10px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  overflow: hidden;
+}
+
+body.body--light .trato-hint-expand.trato-trust-legend,
+body.body--light .trato-hint-expand.trato-hint-banner {
+  background: #f4f6f8;
+  color: #37474f;
+}
+
+body.body--dark .trato-hint-expand {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.14);
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.trato-btc-price-chip {
+  max-width: min(100%, 440px);
+  height: auto;
+  margin: 0;
+  white-space: nowrap;
+}
+
+@media (max-width: 599px) {
+  .trato-book-toolbar__meta {
+    white-space: normal;
+    flex-basis: 100%;
+  }
+
+  .trato-btc-price-chip {
+    white-space: normal;
+    font-size: 11px;
+  }
+}
+
+.trato-trust-chip {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.trato-rep-badges {
+  flex-wrap: wrap;
+}
+
+.trato-rep-badge {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 4px 7px;
+  border-radius: 6px;
+}
+
+.trato-trust-new {
+  color: #e64a19;
+}
+
+.trato-trust-building {
+  color: #546e7a;
+}
+
+.trato-trust-trusted {
+  color: #2e7d32;
+}
+
+.trato-trust-bonded {
+  color: #1b5e20;
+}
+
+body.body--dark .trato-trust-new {
+  color: #ffab91;
+}
+
+body.body--dark .trato-trust-building {
+  color: #b0bec5;
+}
+
+body.body--dark .trato-trust-trusted,
+body.body--dark .trato-trust-bonded {
+  color: #a5d6a7;
+}
+
+.trato-trust-panel {
+  border-radius: 0;
+}
+
+body.body--light .trato-trust-panel {
+  background: #fafafa;
+}
+
+body.body--dark .trato-trust-panel {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+/* Share menu — uses app theme, no banner clutter */
+.trato-share-url-item {
+  max-width: 280px;
+}
+
+.trato-share-url-item .ellipsis {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Make tab labels comfortable on phones (thumb-friendly height). */
+@media (max-width: 599px) {
+  .trato-header .text-h4 {
+    font-size: 1.7rem;
+  }
+  .q-tab {
+    min-height: 48px;
+  }
+
+  .trato-book-filters {
+    grid-template-columns: 1fr;
+  }
+}
+
+.trato-detail-settlement {
+  max-width: 100%;
+}
+
+/* Gate page — login / enable extension (matches operator gate pattern) */
+.trato-gate-body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: Roboto, system-ui, sans-serif;
+  background: #f5f5f5;
+  color: #1a1a1a;
+}
+
+body.body--dark.trato-gate-body {
+  background: #121212;
+  color: #eee;
+}
+
+.trato-gate {
+  box-sizing: border-box;
+  max-width: 28rem;
+  margin: 0 auto;
+  padding: 3rem 1.25rem 2rem;
+  text-align: center;
+}
+
+.trato-gate__logo {
+  border-radius: 12px;
+}
+
+.trato-gate__title {
+  margin: 1rem 0 0.5rem;
+  font-size: 1.75rem;
+  font-weight: 700;
+}
+
+.trato-gate__lead {
+  margin: 0 0 0.75rem;
+  font-size: 1.05rem;
+  line-height: 1.45;
+}
+
+.trato-gate__detail,
+.trato-gate__hint {
+  margin: 0 0 1rem;
+  font-size: 0.9rem;
+  line-height: 1.45;
+  opacity: 0.85;
+}
+
+.trato-gate__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin: 1.25rem 0;
+}
+
+.trato-gate__btn {
+  display: block;
+  padding: 0.65rem 1rem;
+  border-radius: 8px;
+  text-decoration: none;
+  font-weight: 500;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  color: inherit;
+}
+
+.trato-gate__btn--primary {
+  background: #1976d2;
+  border-color: #1976d2;
+  color: #fff;
+}
