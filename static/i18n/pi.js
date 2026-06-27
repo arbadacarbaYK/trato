@@ -138,7 +138,8 @@ window.TRATO_LOCALE.pi = {
         'Coordinator API confirmed this ad still be public on the source platform.',
       unverified_chip: 'Relay sighting',
       unverified_tooltip:
-        'Spotted on Nostr relays but not confirmed live on the platform yet.'
+        'Spotted on Nostr relays but not confirmed live on the platform yet.',
+      payment_match_tooltip: 'Matches yer saved payment papers'
     },
     user_action: {
       buy: 'Buy BTC',

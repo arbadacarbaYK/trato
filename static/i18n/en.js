@@ -140,7 +140,8 @@ window.TRATO_LOCALE.en = {
         'Coordinator API confirmed this ad is still public on the source platform.',
       unverified_chip: 'Relay only',
       unverified_tooltip:
-        'Seen on Nostr relays but not confirmed live on the platform yet. Open the source app or wait for sync.'
+        'Seen on Nostr relays but not confirmed live on the platform yet. Open the source app or wait for sync.',
+      payment_match_tooltip: 'Matches your payment profile'
     },
     user_action: {
       buy: 'Buy BTC',
