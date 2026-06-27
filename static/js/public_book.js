@@ -31,6 +31,8 @@
   let cachedOrders = []
   let cachedStats = null
   let takeablePlatforms = ['mostro', 'robosats']
+  let dealsDefaultsApplied = false
+  let userPickedDealsFilters = false
 
   if (!sectionsEl || !status || !refreshBtn) {
     if (status) {
@@ -104,7 +106,7 @@
     return side === 'buy' ? -metric.pct : metric.pct
   }
 
-  function dealRowLabel(o, metric) {
+  function dealRowParts(o, metric) {
     const plat = platformLabel(o.platform)
     const prem = premiumLabel(metric.premium)
     const premBit = prem
@@ -117,7 +119,8 @@
     } else {
       feeBit = t('public_book.best_deals.fees_unknown')
     }
-    return `${plat} · ${premBit} · ${feeBit}`
+    const detail = `${premBit} · ${feeBit}`
+    return { plat, detail, full: `${plat} · ${detail}` }
   }
 
   function bestDealsHtml(orders, fiat, side) {
@@ -151,12 +154,15 @@
         const g = goodness[idx]
         const width = Math.max(8, Math.round(((g - minG) / span) * 100))
         const score = formatEffectivePct(row.metric.pct)
-        const label = dealRowLabel(row.o, row.metric)
+        const parts = dealRowParts(row.o, row.metric)
         const rowSide = side === 'buy' ? 'pb-deals-row--buy' : 'pb-deals-row--sell'
         return `<div class="pb-deals-row ${rowSide}">
           <div class="pb-deals-row-meta">
             <span class="pb-deals-rank">${idx + 1}</span>
-            <span class="pb-deals-label">${escapeHtml(label)}</span>
+            <span class="pb-deals-label" title="${escapeHtml(parts.full)}">
+              <span class="pb-deals-label-plat">${escapeHtml(parts.plat)}</span>
+              <span class="pb-deals-label-detail">${escapeHtml(parts.detail)}</span>
+            </span>
           </div>
           <div class="pb-deals-bar-wrap" aria-hidden="true">
             <div class="pb-deals-bar" style="width:${width}%"></div>
@@ -182,27 +188,85 @@
     </section>`
   }
 
-  function renderBestDeals(orders) {
+  function fiatCounts(stats, orders) {
+    const codes = { ...(stats && stats.fiat_codes ? stats.fiat_codes : {}) }
+    for (const o of orders) {
+      const c = (o.fiat_code || '').toUpperCase()
+      if (c) codes[c] = (codes[c] || 0) + 1
+    }
+    return codes
+  }
+
+  function pickDefaultFiat(stats, orders) {
+    const codes = fiatCounts(stats, orders)
+    const keys = Object.keys(codes)
+    if (!keys.length) return null
+    if (codes.EUR) return 'EUR'
+    if (codes.USD) return 'USD'
+    return keys.sort((a, b) => (codes[b] || 0) - (codes[a] || 0))[0]
+  }
+
+  function applyDealsDefaults(stats, orders) {
+    if (userPickedDealsFilters || dealsDefaultsApplied) return false
+    if (!fiatSel || !sideSel) return false
+    let changed = false
+    if (!fiatSel.value) {
+      const fiat = pickDefaultFiat(stats, orders)
+      if (fiat) {
+        fiatSel.value = fiat
+        changed = true
+      }
+    }
+    if (!sideSel.value) {
+      sideSel.value = 'buy'
+      changed = true
+    }
+    return changed
+  }
+
+  function renderBestDeals(orders, stats) {
     if (!dealsEl) return
-    const fiat = fiatSel && fiatSel.value
+    const fiatRaw = fiatSel && fiatSel.value
     const side = sideSel && sideSel.value
-    if (!fiat || !side) {
+    const fiat = fiatRaw
+      ? fiatRaw.toUpperCase()
+      : pickDefaultFiat(stats || cachedStats, orders)
+    const chartSide = side || 'buy'
+    if (!fiat) {
       dealsEl.hidden = false
       dealsEl.innerHTML = `<section class="pb-deals-panel pb-deals-panel--hint" aria-live="polite">
         <p class="pb-deals-hint">${escapeHtml(
-          t('public_book.best_deals.pick_filters')
+          t('public_book.best_deals.loading')
         )}</p>
       </section>`
       return
     }
-    const html = bestDealsHtml(orders, fiat.toUpperCase(), side)
+    let html = bestDealsHtml(orders, fiat, chartSide)
+    let activeSide = chartSide
+    if (!html && chartSide === 'buy') {
+      html = bestDealsHtml(orders, fiat, 'sell')
+      activeSide = 'sell'
+    } else if (!html && chartSide === 'sell') {
+      html = bestDealsHtml(orders, fiat, 'buy')
+      activeSide = 'buy'
+    }
     if (!html) {
-      dealsEl.hidden = true
-      dealsEl.innerHTML = ''
+      dealsEl.hidden = false
+      dealsEl.innerHTML = `<section class="pb-deals-panel pb-deals-panel--hint" aria-live="polite">
+        <p class="pb-deals-hint">${escapeHtml(
+          t('public_book.best_deals.no_offers', { fiat })
+        )}</p>
+      </section>`
       return
     }
     dealsEl.hidden = false
     dealsEl.innerHTML = html
+    if (sideSel && !sideSel.value && activeSide) {
+      sideSel.value = activeSide
+    }
+    if (fiatSel && !fiatSel.value && fiat) {
+      fiatSel.value = fiat
+    }
   }
 
   function userActionDetail(side, fiatCode) {
@@ -505,14 +569,65 @@
     sectionsEl.replaceChildren(renderSectionsFragment(orders))
   }
 
-  async function fetchJson(url) {
-    const res = await fetch(url, { credentials: 'same-origin' })
+  function looksLikeHtml(text) {
+    const head = String(text || '')
+      .trim()
+      .slice(0, 64)
+      .toLowerCase()
+    return head.startsWith('<!doctype') || head.startsWith('<html')
+  }
+
+  function friendlyFetchError(res, text) {
+    const status = res && res.status ? res.status : 0
+    const body = String(text || '').trim()
+    if (looksLikeHtml(body)) {
+      if (status === 502 || status === 503 || status === 504) {
+        return 'LNbits is restarting — wait a few seconds and refresh'
+      }
+      if (status === 404) {
+        return 'Trato API not found — check that the extension is enabled'
+      }
+      return 'Server returned a web page instead of data — try refreshing in a moment'
+    }
+    if (status === 502 || status === 503 || status === 504) {
+      return 'LNbits is temporarily unavailable — try again shortly'
+    }
+    if (body && !body.startsWith('{') && !body.startsWith('[')) {
+      return body.slice(0, 160)
+    }
+    return (res && res.statusText) || 'Request failed'
+  }
+
+  function parseJsonBody(text) {
+    if (!text) return null
+    return JSON.parse(text)
+  }
+
+  function shouldRetryFetch(res, text) {
+    const status = res && res.status ? res.status : 0
+    if (status === 502 || status === 503 || status === 504) return true
+    if (looksLikeHtml(text)) return true
+    return false
+  }
+
+  async function fetchJson(url, attempt) {
+    const tries = attempt || 0
+    const res = await fetch(url, {
+      credentials: 'same-origin',
+      headers: { Accept: 'application/json' }
+    })
     const text = await res.text()
+    if (shouldRetryFetch(res, text) && tries < 2) {
+      await new Promise(r => setTimeout(r, 400 * (tries + 1)))
+      return fetchJson(url, tries + 1)
+    }
     let data
     try {
-      data = text ? JSON.parse(text) : null
+      data = parseJsonBody(text)
     } catch (e) {
-      throw new Error(res.ok ? 'Invalid JSON from server' : text.slice(0, 120) || res.statusText)
+      throw new Error(
+        res.ok ? 'Invalid JSON from server' : friendlyFetchError(res, text)
+      )
     }
     if (!res.ok) {
       const detail =
@@ -520,7 +635,7 @@
           ? typeof data.detail === 'string'
             ? data.detail
             : JSON.stringify(data.detail)
-          : res.statusText || String(res.status)
+          : friendlyFetchError(res, text)
       throw new Error(detail)
     }
     return data
@@ -582,8 +697,27 @@
     return takeablePlatforms.includes(plat)
   }
 
+  function layerMatches(order, settlement) {
+    if (!settlement || settlement === 'any') return true
+    const layers =
+      order && order.layers && order.layers.length
+        ? order.layers
+        : [order && order.layer ? order.layer : 'lightning']
+    return layers.includes(settlement)
+  }
+
   function filterLocal(orders) {
     let list = orders
+    if (sideSel && sideSel.value) {
+      list = list.filter(o => userSide(o.kind) === sideSel.value)
+    }
+    if (fiatSel && fiatSel.value) {
+      const fiat = fiatSel.value.toUpperCase()
+      list = list.filter(o => (o.fiat_code || '').toUpperCase() === fiat)
+    }
+    if (settlementSel && settlementSel.value) {
+      list = list.filter(o => layerMatches(o, settlementSel.value))
+    }
     if (takeableCb && takeableCb.checked) {
       list = list.filter(isTakeableOrder)
     }
@@ -612,11 +746,7 @@
   }
 
   function buildQueryParams() {
-    const params = new URLSearchParams()
-    if (sideSel && sideSel.value) params.set('side', sideSel.value)
-    if (fiatSel && fiatSel.value) params.set('fiat', fiatSel.value)
-    if (settlementSel && settlementSel.value) params.set('settlement', settlementSel.value)
-    return params
+    return new URLSearchParams()
   }
 
   function updateStatsLine(stats, orders) {
@@ -651,7 +781,7 @@
     cachedOrders = orders
     if (stats) cachedStats = stats
     const visible = filterLocal(orders)
-    renderBestDeals(orders)
+    renderBestDeals(orders, cachedStats)
     if (cachedStats) updateStatsLine(cachedStats, orders)
     if (!visible.length) {
       status.hidden = false
@@ -709,14 +839,24 @@
           if (gen !== loadGeneration) return
           applyTakeablePlatforms(stats)
           populateFiat(stats, cachedOrders.length ? cachedOrders : orders)
-          paintOrders(cachedOrders.length ? cachedOrders : orders, stats)
+          const orderSet = cachedOrders.length ? cachedOrders : orders
+          if (
+            !dealsDefaultsApplied &&
+            !userPickedDealsFilters &&
+            applyDealsDefaults(stats, orderSet)
+          ) {
+            dealsDefaultsApplied = true
+          }
+          paintOrders(orderSet, stats)
         })
         .catch(() => {})
     } catch (err) {
       if (gen !== loadGeneration) return
+      status.hidden = false
       status.className = 'pb-error'
+      const detail = err && err.message ? err.message : 'unknown error'
       status.textContent =
-        `Could not load the order book: ${err && err.message ? err.message : 'unknown error'}. ` +
+        `Could not load the order book: ${detail}. ` +
         'Check that Trato is enabled on this LNbits instance, then refresh.'
       if (!hasContent) sectionsEl.hidden = true
     } finally {
@@ -729,7 +869,11 @@
     load()
   })
   ;[sideSel, fiatSel, settlementSel].forEach(el => {
-    if (el) el.addEventListener('change', load)
+    if (!el) return
+    el.addEventListener('change', function () {
+      if (el === sideSel || el === fiatSel) userPickedDealsFilters = true
+      repaintLocal()
+    })
   })
   initFilterUi()
   if (takeableCb) takeableCb.addEventListener('change', repaintLocal)

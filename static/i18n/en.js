@@ -50,6 +50,8 @@ window.TRATO_LOCALE.en = {
           'All-in estimate for selling BTC: premium − half escrow fee · {fiat}',
         pick_filters:
           'Pick a currency and Buy or Sell above to compare the best offers.',
+        loading: 'Loading best deals…',
+        no_offers: 'No ranked offers for {fiat} yet — try another currency or refresh.',
         fee_est: '~{pct}% fee',
         fees_unknown: 'fees n/a',
         premium_only: 'premium only',
