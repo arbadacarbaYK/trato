@@ -205,22 +205,25 @@ window.TRATO_LOCALE.en = {
       waiting_taker: 'Waiting for taker'
     },
     settings: {
-      trading_mostro_live: 'Mostro — live take enabled (mainnet + hold-invoice wallet).',
+      trading_mostro_live:
+        'Mostro — live take enabled (mainnet + NWC or LND hold-invoice wallet).',
       trading_mostro_demo:
         'Mostro — practice trades while Demo mode is on in Settings.',
       trading_mostro_practice:
-        'Mostro — turn off Demo mode and enable mainnet + LND hold invoices for live escrow.',
-      robosats_bonds_title: 'RoboSats (taker bond only)',
+        'Mostro — turn off Demo mode, enable mainnet, and connect NWC or LND hold invoices.',
+      robosats_bonds_title: 'NWC wallet (live Lightning)',
       robosats_bonds_body:
-        'Connect NWC to claim a live RoboSats offer and pay the taker bond. Escrow, chat, and fiat happen on the RoboSats coordinator — not in Trato. Demo mode walks through a practice trade locally.',
+        'Connect NWC to pay live RoboSats bonds and Mostro hold/receive invoices from your phone wallet. Trato syncs RoboSats escrow steps when the coordinator API allows; coordinator chat may still need the RoboSats site. Demo mode needs no NWC.',
       trading_robosats_live:
-        'RoboSats — claim offer + pay taker bond via NWC; finish the trade on RoboSats.',
+        'RoboSats — bond + escrow via NWC where supported; coordinator chat may need RoboSats.',
       trading_robosats_demo:
         'RoboSats — full practice walk-through in Demo (simulated). Connect NWC above to pay real taker bonds live.',
       trading_robosats_setup:
         'RoboSats — connect NWC above to pay taker bonds live, or use Demo mode to practise.',
       trading_browse_only:
-        'Peach, lnp2pbot… — browse-only; open their app to trade.'
+        'Peach, lnp2pbot… — browse-only; open their app to trade.',
+      relay_added: 'Relay added — save settings to use it.',
+      relay_already_listed: 'That relay is already in your list.'
     },
     identity: {
       subtitle: 'Nostr trading identity',

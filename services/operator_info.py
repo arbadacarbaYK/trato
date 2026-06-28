@@ -9,17 +9,10 @@ from loguru import logger
 
 from ..mostro.constants import KIND_INFO
 from ..mostro.operator_info import OperatorInfo, parse_operator_info_tags
-from ..nostr.pubkey import normalize_pubkey
+from ..nostr.relays import relays_for_fetch
 
 CACHE_TTL_SECONDS = 300
 FETCH_TIMEOUT_SECONDS = 15
-
-DEFAULT_RELAYS = [
-    "wss://relay.mostro.network",
-    "wss://relay.damus.io",
-    "wss://nostr.bitcoiner.social",
-    "wss://relay.nostr.net",
-]
 
 
 class OperatorInfoService:
@@ -36,7 +29,7 @@ class OperatorInfoService:
         cached = self._cache.get(hexed)
         if cached and now - cached[1] < CACHE_TTL_SECONDS:
             return cached[0]
-        info = await self._fetch_live(hexed, relays or DEFAULT_RELAYS)
+        info = await self._fetch_live(hexed, relays_for_fetch(relays))
         self._cache[hexed] = (info, now)
         return info
 

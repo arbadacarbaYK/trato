@@ -30,6 +30,7 @@ def build_lightning_receive_choices(
             "source": "lnurlp",
             "source_label": "LNURLp on this instance",
             "detail": detail,
+            "link_url": (addr.get("link_url") or "").strip(),
         }
 
     lud = normalize_lightning_address(lud16)

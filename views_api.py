@@ -68,16 +68,23 @@ from .services.nostr_profile import (
 )
 from .services.platforms import platform_takeable, trading_capabilities
 from .services.operator_info import operator_info_service
+from .services.reputation import reputation_service
 from .services.relay import orderbook
 from .services.robosats_client import new_robot_token
 from .services.robosats_federation import federation
-from .services.robosats_trade import RoboSatsDemoOperator, live_take_robosats
+from .services.robosats_trade import (
+    RoboSatsDemoOperator,
+    apply_live_robosats_action,
+    live_take_robosats,
+    sync_live_robosats,
+)
 from .services.fx_snapshot import capture_fx, merge_fx_into_order_json
 from .services.tax_export import filter_orders_for_export, orders_to_csv
 from .services.trade_engine import (
     DemoOperator,
     DemoTradeIO,
     LnbitsTradeIO,
+    NwcTradeIO,
     TradeEngine,
 )
 from .services.trade_snapshots import seed_demo_trade_context, seed_live_buyer_context
@@ -291,6 +298,19 @@ async def api_get_settings(key_info: WalletTypeInfo = Depends(require_admin_key)
     return settings.public_dict()
 
 
+@trato_api_router.get("/api/v1/settings/nostrrelay-hints")
+async def api_nostrrelay_hints(
+    request: Request,
+    key_info: WalletTypeInfo = Depends(require_admin_key),
+):
+    """Active Nostr Relay extension URLs owned by this LNbits user."""
+    from .services.lnurlp_hints import api_key_from_request_headers
+    from .services.nostrrelay_hints import fetch_nostrrelay_hints
+
+    api_key = api_key_from_request_headers(request.headers)
+    return await fetch_nostrrelay_hints(str(request.base_url), api_key=api_key)
+
+
 @trato_api_router.put("/api/v1/settings")
 async def api_update_settings(
     data: UpdateSettings,
@@ -299,6 +319,10 @@ async def api_update_settings(
     settings = await crud.get_settings(key_info.wallet.user)
     if data.relays is not None:
         settings.relays = [r.strip() for r in data.relays if r.strip()]
+        identity = await crud.get_identity(key_info.wallet.user)
+        if identity:
+            nostr_profile_service.invalidate(identity.identity_pubkey)
+            reputation_service.invalidate(identity.identity_pubkey)
     if data.mostro_pubkey is not None:
         settings.mostro_pubkey = data.mostro_pubkey.strip() or None
     if data.demo_mode is not None:
@@ -748,6 +772,17 @@ async def api_delete_order(
     return {"deleted": True, "id": order_id}
 
 
+def _is_live_robosats_order(order: Order) -> bool:
+    if order.demo:
+        return False
+    try:
+        meta = json.loads(order.order_json or "{}")
+    except json.JSONDecodeError:
+        return False
+    cp = meta.get("counterparty") or {}
+    return (cp.get("platform") or "").strip().lower() == "robosats"
+
+
 def _guard_real_trading(settings, *, platform: str | None = None) -> None:
     """Stop accidental real-money trades when prerequisites are missing."""
     if settings.demo_mode:
@@ -768,11 +803,11 @@ def _guard_real_trading(settings, *, platform: str | None = None) -> None:
             )
         return
     health = escrow_health()
-    if not health["hold_invoices_supported"]:
+    if not health["hold_invoices_supported"] and not settings.encrypted_nwc_uri:
         raise HTTPException(
             HTTPStatus.PRECONDITION_FAILED,
-            "Real Mostro trading needs a hold-invoice-capable funding source. "
-            "Turn on Demo mode in Settings, or connect an LND-type wallet.",
+            "Real Mostro trading needs NWC in Settings or a hold-invoice-capable "
+            "funding source. Turn on Demo mode, or connect your Lightning wallet.",
         )
     if not settings.mainnet_enabled:
         raise HTTPException(
@@ -839,8 +874,8 @@ def _validate_take_settlement(
     if layer == "onchain" and not caps["onchain_take_enabled"]:
         raise HTTPException(
             HTTPStatus.PRECONDITION_FAILED,
-            "On-chain takes need mainnet and LND hold invoices (same as Lightning), "
-            "or turn on Demo mode to practise.",
+            "On-chain takes need mainnet plus NWC or LND hold invoices (same gate "
+            "as Lightning), or turn on Demo mode to practise.",
         )
     if layer == "lightning" and caps.get("lightning_take_enabled") is False:
         raise HTTPException(
@@ -890,10 +925,13 @@ def _trade_keys_for(identity: Identity, trade_index: int):
 
 
 def _engine_for(order: Order, identity: Identity, settings) -> TradeEngine:
-    """Build a trade engine; demo orders use no-money IO, real orders use LNbits."""
+    """Build a trade engine; demo uses no-money IO, live uses NWC or LNbits."""
     store = CrudTradeStore()
     if order.demo:
         return TradeEngine(DemoTradeIO(), store)
+    if settings.encrypted_nwc_uri:
+        nwc_uri = decrypt_secret(settings.encrypted_nwc_uri)
+        return TradeEngine(NwcTradeIO(nwc_uri, settings.relays), store)
     return TradeEngine(LnbitsTradeIO(identity.wallet, settings.relays), store)
 
 
@@ -1129,7 +1167,7 @@ async def api_take_order(
             if pub and pub.platform_instance:
                 coord_alias = coord_alias or pub.platform_instance
             try:
-                await live_take_robosats(
+                take_payload = await live_take_robosats(
                     order=order,
                     coordinator_pubkey=data.mostro_pubkey,
                     coordinator_alias=coord_alias,
@@ -1138,25 +1176,56 @@ async def api_take_order(
                 )
             except RuntimeError as exc:
                 raise HTTPException(HTTPStatus.BAD_GATEWAY, str(exc)) from exc
+            order_json = json.dumps(
+                {
+                    **json.loads(order.order_json or "{}"),
+                    "robosats": {
+                        "bond_paid": True,
+                        "last_status": take_payload.get("status"),
+                    },
+                }
+            )
+            await crud.update_order_fields(order.id, order_json=order_json)
+            order.order_json = order_json
             await engine.store.log(
                 order,
                 "system",
                 "note",
-                "Bond paid in Trato — continue escrow and fiat on the RoboSats coordinator.",
+                "Bond paid in Trato — Trato syncs escrow steps via NWC when possible. "
+                "Coordinator chat may still need the RoboSats site.",
             )
             await engine.store.update(order, status="active")
+            await sync_live_robosats(
+                order, settings, engine.store, nwc_uri=nwc_uri
+            )
     else:
         await engine.take(order, data.kind, keys, fiat_amount=take_fiat_int)
         if order.demo:
             await DemoOperator().after_take(engine, order, keys)
         else:
-            await engine.store.log(
-                order,
-                "system",
-                "note",
-                "Take sent to the operator — follow escrow and payment steps in "
-                "the timeline below.",
-            )
+            layer = (data.settlement_layer or "lightning").strip().lower()
+            if layer == "onchain":
+                await engine.store.log(
+                    order,
+                    "system",
+                    "note",
+                    "On-chain settlement — the operator coordinates the Bitcoin "
+                    "transaction after fiat is confirmed. Share your on-chain "
+                    "receive address in chat when asked.",
+                )
+            else:
+                funding = (
+                    "NWC wallet"
+                    if settings.encrypted_nwc_uri
+                    else "LNbits identity wallet"
+                )
+                await engine.store.log(
+                    order,
+                    "system",
+                    "note",
+                    f"Take sent to the operator — escrow uses your {funding}. "
+                    "Follow payment steps in the timeline below.",
+                )
 
     await _persist_fx_snapshot(user_id, order.id, "fx_at_take")
     await _maybe_snapshot_settlement(user_id, order.id)
@@ -1176,6 +1245,15 @@ async def api_order_detail(
         )
     settings = await crud.get_settings(user_id)
     _guard_order_environment(order, settings)
+    if _is_live_robosats_order(order):
+        nwc_uri = (
+            decrypt_secret(settings.encrypted_nwc_uri)
+            if settings.encrypted_nwc_uri
+            else None
+        )
+        store = CrudTradeStore()
+        await sync_live_robosats(order, settings, store, nwc_uri=nwc_uri)
+        order = await crud.get_order(user_id, order_id) or order
     events = await crud.get_events(user_id, order_id)
     identity = await crud.get_identity(user_id)
     payment_view = _order_payment_view(
@@ -1213,6 +1291,25 @@ async def api_order_action(
 
     keys = _trade_keys_for(identity, order.trade_index)
     engine = _engine_for(order, identity, settings)
+
+    if _is_live_robosats_order(order):
+        try:
+            await apply_live_robosats_action(
+                order, settings, action, rating=data.rating
+            )
+        except RuntimeError as exc:
+            raise HTTPException(HTTPStatus.BAD_GATEWAY, str(exc)) from exc
+        nwc_uri = (
+            decrypt_secret(settings.encrypted_nwc_uri)
+            if settings.encrypted_nwc_uri
+            else None
+        )
+        await sync_live_robosats(
+            order, settings, engine.store, nwc_uri=nwc_uri
+        )
+        await _maybe_snapshot_settlement(user_id, order_id)
+        return await crud.get_order(user_id, order_id)
+
     try:
         await engine.apply_user_action(order, action, keys, rating=data.rating)
     except ValueError as exc:

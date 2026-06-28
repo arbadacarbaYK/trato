@@ -49,6 +49,8 @@ window.TRATO_LOCALE.zh = {
         note: 'Mostro 报价包含估算托管费；其他平台仅显示溢价。',
         effective: '综合 {score}',
         vs_market: '相对市价 {premium}',
+        loading: '正在加载最佳报价…',
+        no_offers: '尚无 {fiat} 的排名报价 — 请尝试其他货币或刷新。',
       },
       filter_take_in_trato: '在 Trato 接单',
       uncheck_takeable: ' 请取消勾选「在 Trato 接单」以查看中继上的 Peach、HodlHodl 等仅可浏览平台。',
@@ -189,6 +191,8 @@ window.TRATO_LOCALE.zh = {
       robosats_bonds_title: 'RoboSats（仅接单保证金）',
       robosats_bonds_body:
         '连接 NWC 以认领实盘 RoboSats 订单并支付接单保证金。托管、聊天和法币在 RoboSats 协调器上进行，而非 Trato。演示模式在本地练习全流程。',
+      relay_added: 'Relay added — save settings to use it.',
+      relay_already_listed: 'That relay is already in your list.',
     },
     identity: {
       subtitle: 'Nostr 交易身份',

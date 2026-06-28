@@ -56,6 +56,9 @@ window.TRATO_LOCALE.fr = {
           'Les offres Mostro incluent les frais d\'entiercement estimés ; les autres plateformes n\'affichent que la prime.',
         effective: '{score} tout compris',
         vs_market: '{premium} vs marché',
+        loading: 'Chargement des meilleures offres…',
+        no_offers:
+          'Pas encore d\'offres classées pour {fiat} — essayez une autre devise ou actualisez.',
       },
       filter_take_in_trato: 'Prendre dans Trato',
       uncheck_takeable:
@@ -223,6 +226,8 @@ window.TRATO_LOCALE.fr = {
       robosats_bonds_title: 'RoboSats (caution preneur uniquement)',
       robosats_bonds_body:
         'Connectez NWC pour réclamer une offre RoboSats en direct et payer la caution preneur. Escrow, chat et fiat se font sur le coordinateur RoboSats — pas dans Trato. Démo = entraînement local.',
+      relay_added: 'Relay added — save settings to use it.',
+      relay_already_listed: 'That relay is already in your list.',
     },
     identity: {
       subtitle: 'Identité de trading Nostr',

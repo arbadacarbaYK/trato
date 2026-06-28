@@ -8,14 +8,11 @@ from typing import Optional
 
 from loguru import logger
 
+from ..models import DEFAULT_RELAYS
 from ..mostro.constants import KIND_RATING
 from ..mostro.reputation import UserReputation, parse_rating_tags
+from ..nostr.relays import relays_for_fetch
 
-DEFAULT_RELAYS = [
-    "wss://relay.mostro.network",
-    "wss://relay.damus.io",
-    "wss://nostr.wine",
-]
 FETCH_TIMEOUT_SECONDS = 15
 CACHE_TTL_SECONDS = 300
 
@@ -37,9 +34,14 @@ class ReputationService:
         if cached and now - cached[1] < CACHE_TTL_SECONDS:
             return cached[0]
 
-        rep = await self._fetch_live(pubkey, relays or DEFAULT_RELAYS)
+        rep = await self._fetch_live(pubkey, relays_for_fetch(relays))
         self._cache[pubkey] = (rep, now)
         return rep
+
+    def invalidate(self, identity_pubkey: str) -> None:
+        pubkey = (identity_pubkey or "").strip().lower()
+        if pubkey:
+            self._cache.pop(pubkey, None)
 
     async def _fetch_live(
         self, identity_pubkey: str, relays: list[str]

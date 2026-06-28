@@ -56,6 +56,9 @@ window.TRATO_LOCALE.es = {
           'Las ofertas Mostro incluyen comisión de depósito estimada; otras plataformas muestran solo la prima.',
         effective: '{score} total',
         vs_market: '{premium} vs mercado',
+        loading: 'Cargando mejores ofertas…',
+        no_offers:
+          'Aún no hay ofertas clasificadas para {fiat} — prueba otra moneda o actualiza.',
       },
       filter_take_in_trato: 'Aceptar en Trato',
       uncheck_takeable:
@@ -219,6 +222,8 @@ window.TRATO_LOCALE.es = {
       robosats_bonds_title: 'RoboSats (solo fianza del tomador)',
       robosats_bonds_body:
         'Conecta NWC para reclamar una oferta RoboSats en vivo y pagar la fianza del tomador. Depósito, chat y fiat ocurren en el coordinador RoboSats, no en Trato. Demo practica localmente.',
+      relay_added: 'Relay added — save settings to use it.',
+      relay_already_listed: 'That relay is already in your list.',
     },
     identity: {
       subtitle: 'Identidad de trading en Nostr',

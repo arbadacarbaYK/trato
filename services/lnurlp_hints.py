@@ -51,9 +51,19 @@ def lightning_address_from_username(username: str, host: str) -> str:
     return f"{user}@{host_for_lnaddress(host) if '://' in host else host}"
 
 
+def lnurlp_link_admin_url(root: str, link_id: str) -> str:
+    """LNbits LNURLp admin page for one pay link (``/lnurlp/link/{id}``)."""
+    base = root.rstrip("/")
+    lid = (link_id or "").strip()
+    if lid:
+        return f"{base}/lnurlp/link/{lid}"
+    return f"{base}/lnurlp/"
+
+
 def pick_lnurlp_addresses(
     links: list[dict[str, Any]],
     *,
+    root: str,
     wallet_id: str,
     host: str,
 ) -> list[dict[str, str]]:
@@ -75,11 +85,13 @@ def pick_lnurlp_addresses(
         if address in seen:
             continue
         seen.add(address)
+        link_id = str(link.get("id") or "").strip()
         out.append(
             {
                 "lightning_address": address,
                 "username": username,
-                "link_id": str(link.get("id") or ""),
+                "link_id": link_id,
+                "link_url": lnurlp_link_admin_url(root, link_id),
                 "description": (link.get("description") or "").strip(),
             }
         )
@@ -152,7 +164,14 @@ async def fetch_lnurlp_receive_hints(
         return empty
 
     links = payload if isinstance(payload, list) else []
-    addresses = pick_lnurlp_addresses(links, wallet_id=wallet_id, host=host)
+    addresses = pick_lnurlp_addresses(
+        links, root=root, wallet_id=wallet_id, host=host
+    )
+    primary_link_url = (
+        lnurlp_link_admin_url(root, addresses[0]["link_id"])
+        if addresses
+        else lnurlp_url
+    )
 
     note = empty["note"]
     if addresses:
@@ -179,7 +198,7 @@ async def fetch_lnurlp_receive_hints(
 
     return {
         "extension_installed": True,
-        "extension_url": lnurlp_url,
+        "extension_url": primary_link_url,
         "extensions_url": extensions_url,
         "host": host,
         "local_host": local_host,

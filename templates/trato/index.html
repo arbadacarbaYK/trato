@@ -1220,7 +1220,7 @@
                   color="primary"
                   icon="open_in_new"
                   label="Open LNURLp"
-                  :href="lnurlpReceiveHint.extension_url"
+                  :href="lnurlpOpenUrl"
                   target="_blank"
                   class="q-mr-xs"
                 ></q-btn>
@@ -1284,6 +1284,49 @@
                 dense
                 label="Relays (one per line)"
               ></q-input>
+              <q-banner
+                v-if="nostrrelayHints && (nostrrelayHints.relays || []).length"
+                dense
+                class="bg-blue-1 text-blue-10 rounded-borders"
+              >
+                <div v-if="nostrrelayHints.note" class="text-body2">
+                  {{ nostrrelayHints.note }}
+                </div>
+                <div class="q-mt-sm row q-gutter-sm items-center wrap">
+                  <q-btn
+                    flat
+                    dense
+                    no-caps
+                    color="primary"
+                    icon="open_in_new"
+                    label="Open Nostr Relay"
+                    :href="nostrrelayHints.extension_url"
+                    target="_blank"
+                  ></q-btn>
+                  <q-btn
+                    v-for="r in nostrrelayHints.relays"
+                    :key="r.wss_url"
+                    flat
+                    dense
+                    no-caps
+                    color="primary"
+                    icon="add"
+                    :label="'Add ' + r.name + ' (' + r.relay_id + ')'"
+                    @click="appendRelayToSettings(r.wss_url)"
+                  ></q-btn>
+                </div>
+              </q-banner>
+              <div
+                v-else-if="nostrrelayHints && nostrrelayHints.extension_installed"
+                class="text-caption text-grey"
+              >
+                {{ nostrrelayHints.note }}
+                <a
+                  :href="nostrrelayHints.extension_url"
+                  target="_blank"
+                  rel="noopener"
+                >Nostr Relay</a>
+              </div>
               <q-input
                 v-model="settingsForm.mostro_pubkey"
                 outlined
@@ -2555,6 +2598,12 @@
         <div class="text-caption text-grey q-mt-xs">
           {{ $t('trato.identity.edit_caption') }}
         </div>
+        <div
+          v-if="nostrProfileForm.editor.loading"
+          class="text-caption text-grey q-mt-sm"
+        >
+          {{ $t('trato.identity.loading_profile') }}
+        </div>
       </q-card-section>
       <q-card-section class="q-pt-none q-gutter-sm">
         <q-input
@@ -2564,7 +2613,7 @@
           dense
           maxlength="64"
           counter
-          :disable="nostrProfileForm.editor.saving"
+          :disable="nostrProfileForm.editor.saving || nostrProfileForm.editor.loading"
         ></q-input>
         <q-input
           v-model="nostrProfileForm.editor.draft.name"
@@ -2574,7 +2623,7 @@
           maxlength="64"
           counter
           :hint="$t('trato.identity.username_hint')"
-          :disable="nostrProfileForm.editor.saving"
+          :disable="nostrProfileForm.editor.saving || nostrProfileForm.editor.loading"
         ></q-input>
         <q-input
           v-model="nostrProfileForm.editor.draft.picture"
@@ -2583,7 +2632,7 @@
           dense
           maxlength="2048"
           :hint="$t('trato.identity.avatar_hint')"
-          :disable="nostrProfileForm.editor.saving"
+          :disable="nostrProfileForm.editor.saving || nostrProfileForm.editor.loading"
         ></q-input>
         <q-input
           v-model="nostrProfileForm.editor.draft.about"
@@ -2594,7 +2643,7 @@
           autogrow
           maxlength="1000"
           counter
-          :disable="nostrProfileForm.editor.saving"
+          :disable="nostrProfileForm.editor.saving || nostrProfileForm.editor.loading"
         ></q-input>
         <q-input
           v-model="nostrProfileForm.editor.draft.nip05"
@@ -2603,7 +2652,7 @@
           dense
           maxlength="128"
           :hint="$t('trato.identity.nip05_hint')"
-          :disable="nostrProfileForm.editor.saving"
+          :disable="nostrProfileForm.editor.saving || nostrProfileForm.editor.loading"
         ></q-input>
         <q-input
           v-model="nostrProfileForm.editor.draft.lud16"
@@ -2612,23 +2661,24 @@
           dense
           maxlength="200"
           :hint="$t('trato.identity.lud16_hint')"
-          :disable="nostrProfileForm.editor.saving"
+          :disable="nostrProfileForm.editor.saving || nostrProfileForm.editor.loading"
         ></q-input>
       </q-card-section>
       <q-card-actions align="right">
         <q-btn
           flat
           :label="$t('trato.buttons.cancel')"
-          :disable="nostrProfileForm.editor.saving"
+          :disable="nostrProfileForm.editor.saving || nostrProfileForm.editor.loading"
           v-close-popup
         ></q-btn>
         <q-btn
           color="primary"
           :label="$t('trato.buttons.save')"
           :loading="nostrProfileForm.editor.saving"
+          :disable="nostrProfileForm.editor.loading"
           @click="saveNostrProfile"
         ></q-btn>
-      </q-card-actions>
+      </q-card-section>
     </q-card>
   </q-dialog>
 
@@ -3034,7 +3084,7 @@
                 color="primary"
                 icon="open_in_new"
                 label="Open LNURLp"
-                :href="lnurlpReceiveHint.extension_url"
+                :href="lnurlpOpenUrl"
                 target="_blank"
               ></q-btn>
               <q-btn

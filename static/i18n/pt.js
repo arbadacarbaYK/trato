@@ -56,6 +56,9 @@ window.TRATO_LOCALE.pt = {
           'Ofertas Mostro incluem taxa de escrow estimada; outras plataformas mostram só o prémio.',
         effective: '{score} total',
         vs_market: '{premium} vs mercado',
+        loading: 'A carregar melhores ofertas…',
+        no_offers:
+          'Ainda não há ofertas classificadas para {fiat} — tente outra moeda ou atualize.',
       },
       filter_take_in_trato: 'Aceitar no Trato',
       uncheck_takeable:
@@ -218,6 +221,8 @@ window.TRATO_LOCALE.pt = {
       robosats_bonds_title: 'RoboSats (apenas título do tomador)',
       robosats_bonds_body:
         'Conecte NWC para reivindicar uma oferta RoboSats ao vivo e pagar o título do tomador. Escrow, chat e fiat ocorrem no coordenador RoboSats — não no Trato. Demo pratica localmente.',
+      relay_added: 'Relay added — save settings to use it.',
+      relay_already_listed: 'That relay is already in your list.',
     },
     identity: {
       subtitle: 'Identidade de trading no Nostr',

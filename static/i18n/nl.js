@@ -54,6 +54,9 @@ window.TRATO_LOCALE.nl = {
           'Mostro-aanbiedingen bevatten geschatte escrowfee; andere platforms tonen alleen premie.',
         effective: '{score} all-in',
         vs_market: '{premium} vs markt',
+        loading: 'Beste deals laden…',
+        no_offers:
+          'Nog geen gerangschikte aanbiedingen voor {fiat} — probeer een andere valuta of ververs.',
       },
       filter_take_in_trato: 'Aannemen in Trato',
       uncheck_takeable:
@@ -213,6 +216,8 @@ window.TRATO_LOCALE.nl = {
       robosats_bonds_title: 'RoboSats (alleen taker-borg)',
       robosats_bonds_body:
         'Verbind NWC om een live RoboSats-advertentie te claimen en de taker-borg te betalen. Escrow, chat en fiat gebeuren op de RoboSats-coördinator — niet in Trato. Demo is lokaal oefenen.',
+      relay_added: 'Relay added — save settings to use it.',
+      relay_already_listed: 'That relay is already in your list.',
     },
     identity: {
       subtitle: 'Nostr-handelsidentiteit',

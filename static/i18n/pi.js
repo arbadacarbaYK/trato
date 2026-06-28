@@ -49,6 +49,9 @@ window.TRATO_LOCALE.pi = {
           'All-in tally fer sellin’ BTC: premium − half escrow cut · {fiat}',
         pick_filters:
           'Pick a coin an’ Buy or Sell above to spy the best loot.',
+        loading: 'Loadin’ best loot…',
+        no_offers:
+          'No ranked loot fer {fiat} yet — try another coin or refresh.',
         fee_est: '~{pct}% cut',
         fees_unknown: 'cut unknown',
         premium_only: 'premium only',
@@ -216,7 +219,9 @@ window.TRATO_LOCALE.pi = {
       trading_robosats_setup:
         'RoboSats — connect NWC above fer taker bonds live, or use Demo mode to practise.',
       trading_browse_only:
-        'Peach, lnp2pbot… — browse-only; open their app to trade.'
+        'Peach, lnp2pbot… — browse-only; open their app to trade.',
+      relay_added: 'Relay added — save settings to use it.',
+      relay_already_listed: 'That relay is already in yer list.'
     },
     identity: {
       subtitle: 'Nostr tradin’ papers',

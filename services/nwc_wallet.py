@@ -28,8 +28,14 @@ def parse_nwc_uri(uri: str) -> dict[str, str]:
     return {"pubkey": pubkey, "relay": relay, "secret": secret}
 
 
-async def pay_invoice(uri: str, bolt11: str, *, timeout: float = 45.0) -> dict[str, Any]:
-    """Pay a BOLT11 via NWC. Returns the JSON-RPC result dict."""
+async def _nwc_request(
+    uri: str,
+    method: str,
+    params: dict[str, Any],
+    *,
+    timeout: float = 45.0,
+) -> dict[str, Any]:
+    """Send one JSON-RPC call over NWC and return the result dict."""
     parts = parse_nwc_uri(uri)
     import websockets
 
@@ -37,8 +43,8 @@ async def pay_invoice(uri: str, bolt11: str, *, timeout: float = 45.0) -> dict[s
     payload = {
         "jsonrpc": "2.0",
         "id": request_id,
-        "method": "pay_invoice",
-        "params": {"invoice": bolt11},
+        "method": method,
+        "params": params,
     }
     try:
         async with websockets.connect(
@@ -56,12 +62,44 @@ async def pay_invoice(uri: str, bolt11: str, *, timeout: float = 45.0) -> dict[s
                 if "error" in msg:
                     err = msg["error"]
                     raise RuntimeError(
-                        err.get("message") or err.get("code") or "NWC pay failed"
+                        err.get("message") or err.get("code") or f"NWC {method} failed"
                     )
                 return msg.get("result") or {}
     except Exception as exc:  # noqa: BLE001
-        logger.warning(f"trato: NWC pay_invoice failed: {exc}")
+        logger.warning(f"trato: NWC {method} failed: {exc}")
         raise RuntimeError(
-            "Could not pay via your NWC wallet. Check the connection string in "
+            f"Could not complete NWC {method}. Check the connection string in "
             "Settings and that the wallet is online."
         ) from exc
+
+
+async def make_invoice(
+    uri: str,
+    amount_sats: int,
+    memo: str = "",
+    *,
+    timeout: float = 45.0,
+) -> str:
+    """Create a BOLT11 receive invoice via NWC."""
+    if amount_sats <= 0:
+        raise ValueError("amount_sats must be positive")
+    result = await _nwc_request(
+        uri,
+        "make_invoice",
+        {"amount": int(amount_sats), "description": memo or "Trato"},
+        timeout=timeout,
+    )
+    inv = result.get("invoice") or result.get("bolt11")
+    if isinstance(inv, str) and inv.startswith("ln"):
+        return inv
+    raise RuntimeError(
+        "Your NWC wallet did not return a Lightning invoice. Try again or check "
+        "wallet permissions."
+    )
+
+
+async def pay_invoice(uri: str, bolt11: str, *, timeout: float = 45.0) -> dict[str, Any]:
+    """Pay a BOLT11 via NWC. Returns the JSON-RPC result dict."""
+    return await _nwc_request(
+        uri, "pay_invoice", {"invoice": bolt11}, timeout=timeout
+    )

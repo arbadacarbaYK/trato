@@ -23,6 +23,9 @@ DEFAULT_RELAYS = [
     "wss://relay.damus.io",
     "wss://nostr.bitcoiner.social",
     "wss://relay.nostr.net",
+    "wss://nos.lol",
+    "wss://relay.primal.net",
+    "wss://nostr.wine",
     "wss://nostr.robosats.org",
 ]
 

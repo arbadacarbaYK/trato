@@ -50,6 +50,8 @@ window.TRATO_LOCALE.ja = {
         note: 'Mostroオファーはエスクロー手数料の見積もりを含みます。他のプラットフォームはプレミアムのみ表示します。',
         effective: '総合 {score}',
         vs_market: '相場比 {premium}',
+        loading: 'ベストオファーを読み込み中…',
+        no_offers: '{fiat} のランク付きオファーはまだありません — 別の通貨を試すか更新してください。',
       },
       filter_take_in_trato: 'Trato で受注',
       uncheck_takeable: ' 「Trato で受注」のチェックを外すと、リレー上の Peach、HodlHodl など閲覧専用プラットフォームが表示されます。',
@@ -192,6 +194,8 @@ window.TRATO_LOCALE.ja = {
       robosats_bonds_title: 'RoboSats（テイカー保証金のみ）',
       robosats_bonds_body:
         'NWC を接続して本番 RoboSats オファーを取得しテイカー保証金を支払います。エスクロー・チャット・法定通貨は Trato ではなく RoboSats コーディネーターで行います。デモはローカル練習です。',
+      relay_added: 'Relay added — save settings to use it.',
+      relay_already_listed: 'That relay is already in your list.',
     },
     identity: {
       subtitle: 'Nostr 取引アイデンティティ',

@@ -41,20 +41,22 @@ def trading_capabilities(
 ) -> dict:
     """What the UI should advertise as possible right now."""
     live_blockers: list[str] = []
-    live_mostro_ready = mainnet_enabled and hold_invoices
+    live_mostro_ready = mainnet_enabled and (hold_invoices or nwc_configured)
     live_robosats_ready = mainnet_enabled and nwc_configured
     live_take_enabled = live_mostro_ready or live_robosats_ready
 
     if not demo_mode:
         if not mainnet_enabled:
             live_blockers.append("Enable mainnet in Settings.")
-        if not hold_invoices:
+        if not hold_invoices and not nwc_configured:
             live_blockers.append(
-                "Connect a hold-invoice-capable wallet (e.g. LND) for live Mostro escrow."
+                "Connect NWC in Settings or a hold-invoice-capable wallet (e.g. LND) "
+                "for live trades."
             )
-        if not nwc_configured:
+        elif not nwc_configured:
             live_blockers.append(
-                "Connect your Lightning wallet (NWC URI in Settings) for live RoboSats bonds."
+                "Connect your Lightning wallet (NWC URI in Settings) for live "
+                "RoboSats bonds."
             )
 
     op_ready = bool(

@@ -54,6 +54,9 @@ window.TRATO_LOCALE.ru = {
           'В предложениях Mostro учтена оценка комиссии эскроу; на других платформах показана только премия.',
         effective: '{score} всего',
         vs_market: '{premium} к рынку',
+        loading: 'Загрузка лучших предложений…',
+        no_offers:
+          'Пока нет ранжированных предложений для {fiat} — попробуйте другую валюту или обновите.',
       },
       filter_take_in_trato: 'Принять в Trato',
       uncheck_takeable:
@@ -219,6 +222,8 @@ window.TRATO_LOCALE.ru = {
       robosats_bonds_title: 'RoboSats (только залог тейкера)',
       robosats_bonds_body:
         'Подключите NWC, чтобы принять живое предложение RoboSats и оплатить залог тейкера. Эскроу, чат и фиат — на координаторе RoboSats, не в Trato. В Демо — локальная тренировка.',
+      relay_added: 'Relay added — save settings to use it.',
+      relay_already_listed: 'That relay is already in your list.',
     },
     identity: {
       subtitle: 'Торговая личность Nostr',

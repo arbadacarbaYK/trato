@@ -435,6 +435,30 @@ class DemoOperator:
 
 
 # --- Real IO implementations ------------------------------------------------
+async def _nostr_send(order, trade_keys, message_obj: dict, relays: list[str]) -> None:
+    from nostr_sdk import Client, NostrSigner, RelayUrl
+
+    from ..nostr.transport import build_envelope, wrap_to
+
+    envelope = build_envelope(message_obj, trade_keys)
+    wrap = await wrap_to(trade_keys, order.mostro_pubkey, envelope)
+
+    client = Client(NostrSigner.keys(trade_keys))
+    try:
+        for url in relays:
+            try:
+                await client.add_relay(RelayUrl.parse(url))
+            except Exception as exc:  # noqa: BLE001
+                logger.warning(f"trato: bad relay {url!r}: {exc}")
+        await client.connect()
+        await client.send_event(wrap)
+    finally:
+        try:
+            await client.shutdown()
+        except Exception:  # noqa: BLE001
+            pass
+
+
 class DemoTradeIO:
     """No-op IO for demo mode: never moves money, never hits a relay."""
 
@@ -446,6 +470,37 @@ class DemoTradeIO:
 
     async def send(self, order, trade_keys, message_obj: dict) -> None:
         logger.debug(f"trato demo: would send {message_obj}")
+
+
+class NwcTradeIO:
+    """Lightning via the user's NWC wallet; Nostr publish unchanged."""
+
+    def __init__(self, nwc_uri: str, relays: list[str]) -> None:
+        self.nwc_uri = nwc_uri
+        self.relays = relays
+
+    async def pay_hold_invoice(self, order, bolt11: str, amount_sats: int) -> None:
+        import asyncio
+
+        from .nwc_wallet import pay_invoice as nwc_pay_invoice
+
+        async def _pay() -> None:
+            try:
+                await nwc_pay_invoice(self.nwc_uri, bolt11)
+            except Exception as exc:  # noqa: BLE001
+                logger.error(f"trato: NWC hold-invoice payment error: {exc}")
+
+        asyncio.create_task(_pay())
+
+    async def create_receive_invoice(
+        self, order, amount_sats: int, memo: str
+    ) -> str:
+        from .nwc_wallet import make_invoice as nwc_make_invoice
+
+        return await nwc_make_invoice(self.nwc_uri, amount_sats, memo)
+
+    async def send(self, order, trade_keys, message_obj: dict) -> None:
+        await _nostr_send(order, trade_keys, message_obj, self.relays)
 
 
 class LnbitsTradeIO:
@@ -493,26 +548,4 @@ class LnbitsTradeIO:
         return payment.bolt11
 
     async def send(self, order, trade_keys, message_obj: dict) -> None:
-        from datetime import timedelta
-
-        from nostr_sdk import Client, NostrSigner, RelayUrl
-
-        from ..nostr.transport import build_envelope, wrap_to
-
-        envelope = build_envelope(message_obj, trade_keys)
-        wrap = await wrap_to(trade_keys, order.mostro_pubkey, envelope)
-
-        client = Client(NostrSigner.keys(trade_keys))
-        try:
-            for url in self.relays:
-                try:
-                    await client.add_relay(RelayUrl.parse(url))
-                except Exception as exc:  # noqa: BLE001
-                    logger.warning(f"trato: bad relay {url!r}: {exc}")
-            await client.connect()
-            await client.send_event(wrap)
-        finally:
-            try:
-                await client.shutdown()
-            except Exception:  # noqa: BLE001
-                pass
+        await _nostr_send(order, trade_keys, message_obj, self.relays)

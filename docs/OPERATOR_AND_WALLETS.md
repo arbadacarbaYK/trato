@@ -46,31 +46,29 @@ When Phase 4 is live:
 - Optional small **premium** on top is a product choice, but must be disclosed in
   the 38385 `fee` tag — not hidden.
 
-## NWC (future live client mode)
+## NWC (live client mode)
 
-**Not implemented in Trato yet** — no Settings UI, no runtime dependency.
+**Shipped in Trato 0.2.30+** — Settings → **NWC URI** (encrypted at rest).
 
-**Do not** require the LNbits NWC extension on the host for Trato to work today.
-Demo mode uses fake invoices; live take is still gated (`501` / demo-only).
+**Do not** require the LNbits NWC extension on the host. Trato speaks NIP-47
+directly to the user's wallet relay.
 
-When live client mode ships, the plan is:
-
-1. User pastes or connects an **`nwc://` URI** from their own wallet app (Phoenix,
-   Alby, etc.) in Trato Identity/Settings — direct NWC protocol, not necessarily
-   the LNbits NWC extension.
-2. Live trades: pay operator **hold invoices** / create receive invoices via that
-   connection so routing uses **the user's** channels, not a shared LNbits node.
-3. Keep LNbits Identity wallet path for **demo** only, or strict caps until NWC
-   is tested end-to-end.
-
-Until then, verify Trato with **Demo mode on** — no NWC install needed.
+1. User pastes an **`nwc://` URI** from Phoenix, Alby, etc.
+2. **Live Mostro (Lightning):** pay operator hold invoices and create receive
+   invoices via NWC (`NwcTradeIO`) instead of the LNbits identity wallet when NWC
+   is configured.
+3. **Live RoboSats:** pay taker bond, seller escrow, and submit buyer invoices via
+   NWC; poll coordinator REST for status; forward confirm/dispute/cancel when
+   possible. Coordinator **chat** may still require the RoboSats web UI.
+4. Without NWC, Mostro live can fall back to an **LND-type LNbits identity wallet**
+   when hold invoices are supported.
 
 ## On-chain
 
-Trato supports **on-chain settlement in demo** (`settlement_layer: onchain`) and
-book filtering. Live on-chain on the public Mostro network depends on operator
-support; instance operator mode can add on-chain escrow as a Trato-native flow
-later (address + confirmations), separate from Lightning hold invoices.
+Trato supports **on-chain settlement in demo** and **live take** when the book row
+includes `onchain`, mainnet is on, and NWC or LND gating passes. The Nostr take is
+sent to the operator; users share on-chain receive addresses in chat for the
+Bitcoin leg after fiat is confirmed.
 
 ## Public order book
 

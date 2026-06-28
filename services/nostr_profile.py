@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import time
 from dataclasses import dataclass
@@ -10,12 +11,10 @@ from typing import Optional
 
 from loguru import logger
 
-DEFAULT_RELAYS = [
-    "wss://relay.mostro.network",
-    "wss://relay.damus.io",
-    "wss://nostr.wine",
-]
-FETCH_TIMEOUT_SECONDS = 15
+from ..models import DEFAULT_RELAYS
+from ..nostr.relays import relays_for_fetch, relays_for_publish
+CONNECT_TIMEOUT_SECONDS = 8
+LIVE_FETCH_TIMEOUT_SECONDS = 22
 FOLLOWERS_FETCH_LIMIT = 500
 CACHE_TTL_SECONDS = 300
 KIND_METADATA = 0
@@ -201,9 +200,7 @@ async def publish_kind0_metadata(
     """Sign and publish kind-0 metadata; return relay results."""
     from nostr_sdk import Client, NostrSigner, RelayUrl
 
-    urls = [u.strip() for u in (relays or DEFAULT_RELAYS) if u and u.strip()]
-    if not urls:
-        urls = list(DEFAULT_RELAYS)
+    urls = relays_for_publish(relays)
 
     event = sign_metadata_event(signer_keys, metadata)
     client = Client(NostrSigner.keys(signer_keys))
@@ -300,9 +297,20 @@ class NostrProfileService:
         if not force and cached and now - cached[1] < CACHE_TTL_SECONDS:
             return cached[0]
 
-        profile = await self._fetch_live(
-            hexed, relays or DEFAULT_RELAYS, include_counts=include_counts
-        )
+        try:
+            profile = await asyncio.wait_for(
+                self._fetch_live(
+                    hexed,
+                    relays_for_fetch(relays),
+                    include_counts=include_counts,
+                ),
+                timeout=LIVE_FETCH_TIMEOUT_SECONDS,
+            )
+        except asyncio.TimeoutError:
+            logger.warning(f"trato nostr profile fetch timed out for {hexed[:16]}…")
+            if cached:
+                return cached[0]
+            return NostrProfile(pubkey=hexed)
         self._cache[hexed] = (profile, now)
         return profile
 
@@ -357,7 +365,9 @@ class NostrProfileService:
             return NostrProfile(pubkey=pubkey_hex)
 
         try:
-            await client.connect()
+            await asyncio.wait_for(
+                client.connect(), timeout=CONNECT_TIMEOUT_SECONDS
+            )
             pubkey = PublicKey.parse(pubkey_hex)
 
             f_meta = (
@@ -407,12 +417,15 @@ class NostrProfileService:
                     profile.followers_cap_hit = cap_hit
 
             return profile
+        except asyncio.TimeoutError:
+            logger.warning(f"trato nostr profile relay connect timed out for {pubkey_hex[:16]}…")
+            return NostrProfile(pubkey=pubkey_hex)
         except Exception as exc:  # noqa: BLE001
             logger.warning(f"trato nostr profile fetch failed: {exc}")
             return NostrProfile(pubkey=pubkey_hex)
         finally:
             try:
-                await client.shutdown()
+                await asyncio.wait_for(client.shutdown(), timeout=3.0)
             except Exception:  # noqa: BLE001
                 pass
 

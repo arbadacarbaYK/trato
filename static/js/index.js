@@ -202,6 +202,7 @@ window.app = Vue.createApp({
         robosats_coordinator: null
       },
       robosatsCoordinatorOptions: [],
+      nostrrelayHints: null,
       orderbookRefreshing: false,
       orderbookFetched: false,
       clientFilterBusy: false,
@@ -282,6 +283,7 @@ window.app = Vue.createApp({
         editor: {
           show: false,
           saving: false,
+          loading: false,
           draft: {
             display_name: '',
             name: '',
@@ -603,6 +605,15 @@ window.app = Vue.createApp({
       const hint = this.paymentDetailsForm.lnurlpReceive
       if (!hint || typeof hint !== 'object') return null
       return hint
+    },
+    lnurlpOpenUrl() {
+      const hint = this.lnurlpReceiveHint
+      if (!hint) return null
+      const addrs = hint.addresses || []
+      for (const addr of addrs) {
+        if (addr && addr.link_url) return addr.link_url
+      }
+      return hint.extension_url || null
     },
     lightningReceiveChoices() {
       return this.paymentDetailsForm.lightningReceiveChoices || []
@@ -2455,6 +2466,38 @@ window.app = Vue.createApp({
         })
         .catch(() => {})
     },
+    loadNostrrelayHints() {
+      if (!this.adminKey) return
+      LNbits.api
+        .request('GET', '/trato/api/v1/settings/nostrrelay-hints', this.adminKey)
+        .then(res => {
+          this.nostrrelayHints = res.data || null
+        })
+        .catch(() => {
+          this.nostrrelayHints = null
+        })
+    },
+    appendRelayToSettings(wssUrl) {
+      const url = (wssUrl || '').trim()
+      if (!url) return
+      const lines = this.settingsForm.relaysText
+        .split('\n')
+        .map(r => r.trim())
+        .filter(Boolean)
+      if (lines.includes(url)) {
+        this.$q.notify({
+          type: 'info',
+          message: this.t('settings.relay_already_listed')
+        })
+        return
+      }
+      lines.push(url)
+      this.settingsForm.relaysText = lines.join('\n')
+      this.$q.notify({
+        type: 'positive',
+        message: this.t('settings.relay_added')
+      })
+    },
     loadSettings() {
       if (!this.adminKey) return
       LNbits.api
@@ -2476,6 +2519,7 @@ window.app = Vue.createApp({
             robosats_coordinator: data.robosats_coordinator || null
           }
           this.loadRobosatsCoordinators()
+          this.loadNostrrelayHints()
           if (this.tab === 'book') this.loadOrderbook()
         })
         .catch(err => {
@@ -2555,6 +2599,10 @@ window.app = Vue.createApp({
           })
           this.loadHealth()
           this.loadMyOrders()
+          if (this.identity && this.identity.identity_pubkey) {
+            const key = this.identity.identity_pubkey.toLowerCase()
+            delete this.nostrProfiles[key]
+          }
           if (
             this.tradeDialog.show &&
             this.tradeDialog.order &&
@@ -4085,12 +4133,14 @@ window.app = Vue.createApp({
       }
       this.nostrProfileForm.editor.show = true
       if (!this.adminKey) return
-      this.$q.loading.show({message: this.t('identity.loading_profile')})
-      this.g
+      this.nostrProfileForm.editor.loading = true
+      LNbits.api
         .request(
           'GET',
           '/trato/api/v1/identity/nostr-profile?refresh=1&include_counts=0',
-          this.adminKey
+          this.adminKey,
+          null,
+          {timeout: 20000}
         )
         .then(res => {
           const data = res.data || {}
@@ -4115,7 +4165,7 @@ window.app = Vue.createApp({
           })
         })
         .finally(() => {
-          this.$q.loading.hide()
+          this.nostrProfileForm.editor.loading = false
         })
     },
     saveNostrProfile() {
